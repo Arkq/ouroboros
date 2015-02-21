@@ -4,4 +4,11 @@
 bin_PROGRAMS = ouroboros
 
 ouroboros_SOURCES = \
+	config.c \
 	main.c
+
+ouroboros_CFLAGS = \
+	@LIBCONFIG_CFLAGS@
+
+ouroboros_LDFLAGS = \
+	@LIBCONFIG_LIBS@

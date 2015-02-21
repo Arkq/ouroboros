@@ -21,5 +21,16 @@ AM_COND_IF(
 )
 
 
+AC_CHECK_HEADERS(
+	[sys/inotify.h],
+	[], [AC_MSG_ERROR([inotify.h header not found])],
+)
+
+PKG_CHECK_MODULES(
+	[LIBCONFIG], [libconfig],
+	[], [AC_MSG_ERROR([module libconfig not found])],
+)
+
+
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
