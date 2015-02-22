@@ -13,11 +13,14 @@
 #endif
 
 #include <getopt.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/inotify.h>
 
 #include "config.h"
+#include "process.h"
 
 
 int main(int argc, char **argv) {
@@ -113,6 +116,54 @@ return_usage:
 			break;
 		}
 
+	struct ouroboros_process process = { 0 };
+	struct pollfd pfds[2];
+	char buffer[1024];
+	int restart;
+
+	/* poll standard input - IO redirection */
+	pfds[0].events = POLLIN;
+	pfds[0].fd = config.input_pass_through ? fileno(stdin) : -1;
+
+	/* setup inotify subsystem */
+	pfds[1].events = POLLIN;
+	pfds[1].fd = inotify_init1(IN_CLOEXEC);
+
+	ouroboros_process_init(&process, argv[optind], &argv[optind]);
+	process.output = config.output_redirect;
+	process.signal = config.kill_signal;
+
+	/* run main maintenance loop */
+	for (restart = 1;;) {
+
+		if (restart) {
+			restart = 0;
+			if (start_ouroboros_process(&process)) {
+				fprintf(stderr, "error: process starting failed\n");
+				return EXIT_FAILURE;
+			}
+		}
+
+		poll(pfds, 2, -1);
+
+		/* forward received input to the process */
+		if (pfds[0].revents & POLLIN) {
+			ssize_t rlen = read(pfds[0].fd, buffer, sizeof(buffer));
+			if (write(process.stdinfd[1], buffer, rlen) != rlen)
+				fprintf(stderr, "warning: data lost during input forwarding\n");
+		}
+
+		if (pfds[1].revents & POLLIN) {
+		}
+
+	}
+
+	/* get the return value of watched process, if possible */
+	int retval = EXIT_SUCCESS;
+	if (process.status && WIFEXITED(process.status))
+		retval = WEXITSTATUS(process.status);
+
+	ouroboros_process_free(&process);
 	ouroboros_config_free(&config);
-	return EXIT_SUCCESS;
+	return retval;
 }
