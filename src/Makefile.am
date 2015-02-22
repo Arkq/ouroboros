@@ -5,6 +5,7 @@ bin_PROGRAMS = ouroboros
 
 ouroboros_SOURCES = \
 	config.c \
+	notify.c \
 	process.c \
 	main.c
 

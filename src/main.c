@@ -17,9 +17,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/inotify.h>
 
 #include "config.h"
+#include "notify.h"
 #include "process.h"
 
 
@@ -122,9 +122,16 @@ return_usage:
 		}
 
 	struct ouroboros_process process = { 0 };
+	struct ouroboros_notify notify = { 0 };
 	struct pollfd pfds[2];
 	char buffer[1024];
 	int restart;
+	int timeout;
+	int rv;
+
+	ouroboros_notify_init(&notify);
+	notify.pattern_include = config.pattern_include;
+	notify.pattern_exclude = config.pattern_exclude;
 
 	/* poll standard input - IO redirection */
 	pfds[0].events = POLLIN;
@@ -132,24 +139,35 @@ return_usage:
 
 	/* setup inotify subsystem */
 	pfds[1].events = POLLIN;
-	pfds[1].fd = inotify_init1(IN_CLOEXEC);
+	pfds[1].fd = notify.fd;
 
 	ouroboros_process_init(&process, argv[optind], &argv[optind]);
 	process.output = config.output_redirect;
 	process.signal = config.kill_signal;
+
+	ouroboros_notify_watch_directories(&notify, config.watch_directory);
 
 	/* run main maintenance loop */
 	for (restart = 1;;) {
 
 		if (restart) {
 			restart = 0;
+			timeout = -1;
+			kill_ouroboros_process(&process);
 			if (start_ouroboros_process(&process)) {
 				fprintf(stderr, "error: process starting failed\n");
 				return EXIT_FAILURE;
 			}
 		}
 
-		poll(pfds, 2, -1);
+		if ((rv = poll(pfds, 2, timeout)) == -1)
+			break;  /* signal interruption */
+
+		/* maintain kill latency */
+		if (rv == 0) {
+			restart = 1;
+			continue;
+		}
 
 		/* forward received input to the process */
 		if (pfds[0].revents & POLLIN) {
@@ -158,10 +176,16 @@ return_usage:
 				fprintf(stderr, "warning: data lost during input forwarding\n");
 		}
 
+		/* dispatch notification event */
 		if (pfds[1].revents & POLLIN) {
+			timeout = config.kill_latency * 1000;
+			ouroboros_notify_dispatch(&notify);
 		}
 
 	}
+
+	/* use signal from the configuration to kill process */
+	kill_ouroboros_process(&process);
 
 	/* get the return value of watched process, if possible */
 	int retval = EXIT_SUCCESS;

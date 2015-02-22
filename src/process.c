@@ -35,14 +35,16 @@ void ouroboros_process_free(struct ouroboros_process *process) {
 	close(process->stdinfd[1]);
 }
 
-int start_ouroboros_process(struct ouroboros_process *process) {
-
-	/* kill previous process instance */
+/* Kill running instance of watched process. */
+void kill_ouroboros_process(struct ouroboros_process *process) {
 	if (process->pid > 0) {
 		if (kill(process->pid, process->signal) == -1)
 			perror("warning: unable to kill process");
 		waitpid(process->pid, &process->status, 0);
 	}
+}
+
+int start_ouroboros_process(struct ouroboros_process *process) {
 
 	if ((process->pid = fork()) == -1)
 		return -1;

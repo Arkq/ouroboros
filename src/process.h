@@ -35,6 +35,7 @@ struct ouroboros_process {
 void ouroboros_process_init(struct ouroboros_process *process,
 		const char *file, char *argv[]);
 void ouroboros_process_free(struct ouroboros_process *process);
+void kill_ouroboros_process(struct ouroboros_process *process);
 int start_ouroboros_process(struct ouroboros_process *process);
 
 #endif
