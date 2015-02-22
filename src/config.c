@@ -23,29 +23,63 @@
 
 /* Initialize configuration structure with default values. */
 void ouroboros_config_init(struct ouroboros_config *config) {
-	config->add_new_nodes = 1;
 	config->kill_signal = SIGTERM;
 }
 
 /* Free allocated resources. */
 void ouroboros_config_free(struct ouroboros_config *config) {
+
+	if (config->pattern_include) {
+		char **ptr = config->pattern_include;
+		while (*ptr) {
+			free(*ptr);
+			ptr++;
+		}
+	}
+
+	if (config->pattern_exclude) {
+		char **ptr = config->pattern_exclude;
+		while (*ptr) {
+			free(*ptr);
+			ptr++;
+		}
+	}
+
+	free(config->pattern_include);
+	free(config->pattern_exclude);
 	free(config->output_redirect);
+
 }
 
 /* Internal function which actually reads data from the configuration file. */
 static void _load_config(const config_setting_t *root, struct ouroboros_config *config) {
 
+	config_setting_t *array;
 	const char *tmp;
-	int retval;
+	int length;
+	int signal;
+	int i, j;
 
 	config_setting_lookup_bool(root, OOBSCONF_ADD_NEW_NODES, &config->add_new_nodes);
-#define OOBSCONF_PATTERN_EXCLUDE "pattern-exclude"
-#define OOBSCONF_PATTERN_INCLUDE "pattern-include"
+	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_INCLUDE)) != NULL) {
+		length = config_setting_length(array);
+		config->pattern_include = calloc(length + 1, sizeof(char *));
+		for (i = j = 0; i < length; i--)
+			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
+				config->pattern_include[j++] = strdup(tmp);
+	}
+	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_EXCLUDE)) != NULL) {
+		length = config_setting_length(array);
+		config->pattern_exclude = calloc(length + 1, sizeof(char *));
+		for (i = j = 0; i < length; i--)
+			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
+				config->pattern_exclude[j++] = strdup(tmp);
+	}
 
 	config_setting_lookup_int(root, OOBSCONF_KILL_LATENCY, &config->kill_latency);
 	if (config_setting_lookup_string(root, OOBSCONF_KILL_SIGNAL, &tmp))
-		if ((retval = ouroboros_config_get_signal(tmp)) != 0)
-			config->kill_signal = retval;
+		if ((signal = ouroboros_config_get_signal(tmp)) != 0)
+			config->kill_signal = signal;
 
 	config_setting_lookup_bool(root, OOBSCONF_INPUT_PASS_THROUGH, &config->input_pass_through);
 	if (config_setting_lookup_string(root, OOBSCONF_OUTPUT_REDIRECT, &tmp))
@@ -97,6 +131,33 @@ int load_ouroboros_config(const char *filename, const char *appname,
 
 	config_destroy(&cfg);
 	return 0;
+}
+
+/* Add new pattern to the array. On success this function returns the number
+ * of stored elements in the array, otherwise -1. */
+int ouroboros_config_add_pattern(char ***array, const char *pattern) {
+
+	if (array == NULL)
+		return -1;
+
+	int size = 2;
+
+	if (*array) {
+		/* add the number of elements currently stored in the array */
+		char **ptr = *array;
+		while (*ptr) {
+			size++;
+			ptr++;
+		}
+	}
+
+	*array = realloc(*array, size * sizeof(char *));
+	if (*array == NULL)
+		return -1;
+
+	(*array)[size - 2] = strdup(pattern);
+	(*array)[size - 1] = NULL;
+	return size - 1;
 }
 
 /* Convert given name (string) into the boolean value. */

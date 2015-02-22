@@ -23,14 +23,14 @@
 int main(int argc, char **argv) {
 
 	int opt;
-	const char *opts = "hc:n:e:i:l:s:p:o:";
+	const char *opts = "hc:n:i:e:l:s:p:o:";
 	struct option longopts[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"config", required_argument, NULL, 'c'},
 		/* runtime configuration */
 		{"add-new-nodes", required_argument, NULL, 'n'},
-		{"pattern-exclude", required_argument, NULL, 'e'},
 		{"pattern-include", required_argument, NULL, 'i'},
+		{"pattern-exclude", required_argument, NULL, 'e'},
 		{"kill-latency", required_argument, NULL, 'l'},
 		{"kill-signal", required_argument, NULL, 's'},
 		{"input-pass-through", required_argument, NULL, 'p'},
@@ -46,7 +46,16 @@ int main(int argc, char **argv) {
 		switch (opt) {
 		case 'h':
 return_usage:
-			printf("usage: %s [OPTION]... [COMMAND [ARG]...]\n", argv[0]);
+			printf("usage: %s [options] <command ...>\n"
+					"  -c, --config=FILE\t\tuse this configuration file\n"
+					"  -n, --add-new-nodes=BOOL\n"
+					"  -i, --pattern-include=REGEXP\n"
+					"  -e, --pattern-exclude=REGEXP\n"
+					"  -l, --kill-latency=VALUE\n"
+					"  -s, --kill-signal=VALUE\n"
+					"  -p, --input-pass-through=BOOL\n"
+					"  -o, --output-redirect=FILE\n",
+					argv[0]);
 			return EXIT_SUCCESS;
 
 		case 'c':
@@ -79,9 +88,11 @@ return_usage:
 		case 'n':
 			config.add_new_nodes = ouroboros_config_get_bool(optarg);
 			break;
-		case 'e':
-			break;
 		case 'i':
+			ouroboros_config_add_pattern(&config.pattern_include, optarg);
+			break;
+		case 'e':
+			ouroboros_config_add_pattern(&config.pattern_exclude, optarg);
 			break;
 		case 'l':
 			config.kill_latency = strtol(optarg, NULL, 0);
