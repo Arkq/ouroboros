@@ -26,29 +26,24 @@ void ouroboros_config_init(struct ouroboros_config *config) {
 	config->kill_signal = SIGTERM;
 }
 
+/* Internal function which actually frees array resources. */
+static void _free_array(char **array) {
+	char **ptr = array;
+	if (ptr) {
+		while (*ptr) {
+			free(*ptr);
+			ptr++;
+		}
+		free(ptr);
+	}
+}
+
 /* Free allocated resources. */
 void ouroboros_config_free(struct ouroboros_config *config) {
-
-	if (config->pattern_include) {
-		char **ptr = config->pattern_include;
-		while (*ptr) {
-			free(*ptr);
-			ptr++;
-		}
-	}
-
-	if (config->pattern_exclude) {
-		char **ptr = config->pattern_exclude;
-		while (*ptr) {
-			free(*ptr);
-			ptr++;
-		}
-	}
-
-	free(config->pattern_include);
-	free(config->pattern_exclude);
+	_free_array(config->watch_directory);
+	_free_array(config->pattern_include);
+	_free_array(config->pattern_exclude);
 	free(config->output_redirect);
-
 }
 
 /* Internal function which actually reads data from the configuration file. */
@@ -58,22 +53,26 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 	const char *tmp;
 	int length;
 	int signal;
-	int i, j;
+	int i;
 
 	config_setting_lookup_bool(root, OOBSCONF_ADD_NEW_NODES, &config->add_new_nodes);
+	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_DIRECTORY)) != NULL) {
+		length = config_setting_length(array);
+		for (i = 0; i < length; i--)
+			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
+				ouroboros_config_add_pattern(&config->watch_directory, tmp);
+	}
 	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_INCLUDE)) != NULL) {
 		length = config_setting_length(array);
-		config->pattern_include = calloc(length + 1, sizeof(char *));
-		for (i = j = 0; i < length; i--)
+		for (i = 0; i < length; i--)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
-				config->pattern_include[j++] = strdup(tmp);
+				ouroboros_config_add_pattern(&config->pattern_include, tmp);
 	}
 	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_EXCLUDE)) != NULL) {
 		length = config_setting_length(array);
-		config->pattern_exclude = calloc(length + 1, sizeof(char *));
-		for (i = j = 0; i < length; i--)
+		for (i = 0; i < length; i--)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
-				config->pattern_exclude[j++] = strdup(tmp);
+				ouroboros_config_add_pattern(&config->pattern_exclude, tmp);
 	}
 
 	config_setting_lookup_int(root, OOBSCONF_KILL_LATENCY, &config->kill_latency);

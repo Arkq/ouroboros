@@ -26,19 +26,20 @@
 int main(int argc, char **argv) {
 
 	int opt;
-	const char *opts = "hc:n:i:e:l:s:p:o:";
+	const char *opts = "hc:n:d:i:e:l:s:p:o:";
 	struct option longopts[] = {
-		{"help", no_argument, NULL, 'h'},
-		{"config", required_argument, NULL, 'c'},
+		{ "help", no_argument, NULL, 'h' },
+		{ "config", required_argument, NULL, 'c' },
 		/* runtime configuration */
-		{"add-new-nodes", required_argument, NULL, 'n'},
-		{"pattern-include", required_argument, NULL, 'i'},
-		{"pattern-exclude", required_argument, NULL, 'e'},
-		{"kill-latency", required_argument, NULL, 'l'},
-		{"kill-signal", required_argument, NULL, 's'},
-		{"input-pass-through", required_argument, NULL, 'p'},
-		{"output-redirect", required_argument, NULL, 'o'},
-		{0, 0, 0, 0},
+		{ OOBSCONF_ADD_NEW_NODES, required_argument, NULL, 'n' },
+		{ OOBSCONF_WATCH_DIRECTORY, required_argument, NULL, 'd' },
+		{ OOBSCONF_PATTERN_INCLUDE, required_argument, NULL, 'i' },
+		{ OOBSCONF_PATTERN_EXCLUDE, required_argument, NULL, 'e' },
+		{ OOBSCONF_KILL_LATENCY, required_argument, NULL, 'l' },
+		{ OOBSCONF_KILL_SIGNAL, required_argument, NULL, 's' },
+		{ OOBSCONF_INPUT_PASS_THROUGH, required_argument, NULL, 'p' },
+		{ OOBSCONF_OUTPUT_REDIRECT, required_argument, NULL, 'o' },
+		{ 0, 0, 0, 0 },
 	};
 
 	struct ouroboros_config config = { 0 };
@@ -52,6 +53,7 @@ return_usage:
 			printf("usage: %s [options] <command ...>\n"
 					"  -c, --config=FILE\t\tuse this configuration file\n"
 					"  -n, --add-new-nodes=BOOL\n"
+					"  -d, --watch-directory=DIR\n"
 					"  -i, --pattern-include=REGEXP\n"
 					"  -e, --pattern-exclude=REGEXP\n"
 					"  -l, --kill-latency=VALUE\n"
@@ -90,6 +92,9 @@ return_usage:
 		switch (opt) {
 		case 'n':
 			config.add_new_nodes = ouroboros_config_get_bool(optarg);
+			break;
+		case 'd':
+			ouroboros_config_add_pattern(&config.watch_directory, optarg);
 			break;
 		case 'i':
 			ouroboros_config_add_pattern(&config.pattern_include, optarg);

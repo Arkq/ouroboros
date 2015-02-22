@@ -15,6 +15,7 @@
 /* key definitions for configuration file */
 #define OOBSCONF_APP_FILENAME "filename"
 #define OOBSCONF_ADD_NEW_NODES "add-new-nodes"
+#define OOBSCONF_WATCH_DIRECTORY "watch-directory"
 #define OOBSCONF_PATTERN_INCLUDE "pattern-include"
 #define OOBSCONF_PATTERN_EXCLUDE "pattern-exclude"
 #define OOBSCONF_KILL_LATENCY "kill-latency"
@@ -27,6 +28,7 @@ struct ouroboros_config {
 
 	/* inotify notification */
 	int add_new_nodes;
+	char **watch_directory;
 	char **pattern_include;
 	char **pattern_exclude;
 
