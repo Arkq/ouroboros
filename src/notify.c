@@ -21,26 +21,75 @@
 #include "debug.h"
 
 
+/* Internal function for regexp patterns compilation. On success this function
+ * returns the number of compiled patterns, otherwise -1 is returned. */
+int _compile_patterns(regex_t **array, char **patterns) {
+
+	int size = 0;
+	int i;
+
+	/* count the number of patterns */
+	if (patterns) {
+		char **ptr = patterns;
+		while (*ptr) {
+			size++;
+			ptr++;
+		}
+	}
+
+	*array = malloc(sizeof(regex_t) * size);
+	for (i = 0; i < size; i++)
+		regcomp(&(*array)[i], patterns[i], REG_EXTENDED | REG_NOSUB);
+
+	return size;
+}
+
 /* Initialize inotify monitoring subsystem. */
-void ouroboros_notify_init(struct ouroboros_notify *notify) {
+void ouroboros_notify_init(struct ouroboros_notify *notify,
+		char **include, char **exclude) {
 	notify->fd = inotify_init1(IN_CLOEXEC);
+	notify->inclpatt_length = _compile_patterns(&notify->pattern_include, include);
+	notify->exclpatt_length = _compile_patterns(&notify->pattern_exclude, exclude);
 }
 
 /* Free allocated resources. */
 void ouroboros_notify_free(struct ouroboros_notify *notify) {
+
+	int i;
+
+	for (i = 0; i < notify->inclpatt_length; i++)
+		regfree(&notify->pattern_include[i]);
+	for (i = 0; i < notify->exclpatt_length; i++)
+		regfree(&notify->pattern_include[i]);
+
+	free(notify->pattern_include);
+	free(notify->pattern_exclude);
+
 	close(notify->fd);
 }
 
 /* Dispatch notification event and optionally add new directories into the
- * monitoring subsystem. Upon error this function returns -1. */
+ * monitoring subsystem. If current event matches given patterns, then this
+ * function returns 1. Upon error this function returns -1. */
 int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 
 	char buffer[sizeof(struct inotify_event) + NAME_MAX + 1];
 	struct inotify_event *e = (struct inotify_event *)buffer;
 	ssize_t rlen;
+	int i;
 
 	rlen = read(notify->fd, e, sizeof(buffer));
-	debug("notify event: wd=%d, mask=%x", e->wd, e->mask);
+	debug("notify event: wd=%d, mask=%x, name=%s", e->wd, e->mask, e->name);
+
+	/* check the name against include patterns, if matched, then check against
+	 * exclude patterns - exclude takes precedence over include */
+	for (i = 0; i < notify->inclpatt_length; i++)
+		if (regexec(&notify->pattern_include[i], e->name, 0, NULL, 0) == 0) {
+			for (i = 0; i < notify->exclpatt_length; i++)
+				if (regexec(&notify->pattern_exclude[i], e->name, 0, NULL, 0) == 0)
+					return 0;
+			return 1;
+		}
 
 	return 0;
 }

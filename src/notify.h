@@ -11,18 +11,24 @@
 #ifndef __NOTIFY_H
 #define __NOTIFY_H
 
+#include <regex.h>
+
 
 struct ouroboros_notify {
 
 	int fd;
 
-	char **pattern_include;
-	char **pattern_exclude;
+	/* compiled ERE patterns */
+	regex_t *pattern_include;
+	regex_t *pattern_exclude;
+	int inclpatt_length;
+	int exclpatt_length;
 
 };
 
 
-void ouroboros_notify_init(struct ouroboros_notify *notify);
+void ouroboros_notify_init(struct ouroboros_notify *notify,
+		char **include, char **exclude);
 void ouroboros_notify_free(struct ouroboros_notify *notify);
 int ouroboros_notify_dispatch(struct ouroboros_notify *notify);
 int ouroboros_notify_watch(struct ouroboros_notify *notify, const char *path);

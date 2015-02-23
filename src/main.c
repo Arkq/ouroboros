@@ -130,9 +130,12 @@ return_usage:
 	int timeout;
 	int rv;
 
-	ouroboros_notify_init(&notify);
-	notify.pattern_include = config.pattern_include;
-	notify.pattern_exclude = config.pattern_exclude;
+	ouroboros_process_init(&process, argv[optind], &argv[optind]);
+	process.output = config.output_redirect;
+	process.signal = config.kill_signal;
+
+	ouroboros_notify_init(&notify, config.pattern_include, config.pattern_exclude);
+	ouroboros_notify_watch_directories(&notify, config.watch_directory);
 
 	/* poll standard input - IO redirection */
 	pfds[0].events = POLLIN;
@@ -141,12 +144,6 @@ return_usage:
 	/* setup inotify subsystem */
 	pfds[1].events = POLLIN;
 	pfds[1].fd = notify.fd;
-
-	ouroboros_process_init(&process, argv[optind], &argv[optind]);
-	process.output = config.output_redirect;
-	process.signal = config.kill_signal;
-
-	ouroboros_notify_watch_directories(&notify, config.watch_directory);
 
 	/* run main maintenance loop */
 	for (restart = 1;;) {
@@ -179,8 +176,8 @@ return_usage:
 
 		/* dispatch notification event */
 		if (pfds[1].revents & POLLIN) {
-			timeout = config.kill_latency * 1000;
-			ouroboros_notify_dispatch(&notify);
+			if (ouroboros_notify_dispatch(&notify) == 1)
+				timeout = config.kill_latency * 1000;
 		}
 
 	}
