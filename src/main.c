@@ -30,7 +30,9 @@ int main(int argc, char **argv) {
 	const char *opts = "hc:n:d:i:e:l:s:p:o:";
 	struct option longopts[] = {
 		{ "help", no_argument, NULL, 'h' },
+#if ENABLE_LIBCONFIG
 		{ "config", required_argument, NULL, 'c' },
+#endif
 		/* runtime configuration */
 		{ OOBSCONF_ADD_NEW_NODES, required_argument, NULL, 'n' },
 		{ OOBSCONF_WATCH_DIRECTORY, required_argument, NULL, 'd' },
@@ -52,7 +54,9 @@ int main(int argc, char **argv) {
 		case 'h':
 return_usage:
 			printf("usage: %s [options] <command ...>\n"
+#if ENABLE_LIBCONFIG
 					"  -c, --config=FILE\t\tuse this configuration file\n"
+#endif
 					"  -n, --add-new-nodes=BOOL\n"
 					"  -d, --watch-directory=DIR\n"
 					"  -i, --pattern-include=REGEXP\n"
@@ -80,12 +84,14 @@ return_usage:
 
 	/* load configuration (internal one and from the file) */
 	ouroboros_config_init(&config);
+#if ENABLE_LIBCONFIG
 	if (config_file == NULL)
 		config_file = get_ouroboros_config_file();
 	if (load_ouroboros_config(config_file, argv[optind], &config)) {
 		fprintf(stderr, "error: unable to load config file\n");
 		return EXIT_FAILURE;
 	}
+#endif /* ENABLE_LIBCONFIG */
 
 	/* parse options - second pass */
 	optind = 0;

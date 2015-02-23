@@ -26,9 +26,19 @@ AC_CHECK_HEADERS(
 	[], [AC_MSG_ERROR([inotify.h header not found])],
 )
 
-PKG_CHECK_MODULES(
-	[LIBCONFIG], [libconfig],
-	[], [AC_MSG_ERROR([module libconfig not found])],
+# support for the libconfig
+AC_ARG_ENABLE(
+	[libconfig],
+	[AS_HELP_STRING([--enable-libconfig], [enable libconfig support])],
+)
+AM_CONDITIONAL([ENABLE_LIBCONFIG], [test "x$enable_libconfig" = "xyes"])
+AM_COND_IF(
+	[ENABLE_LIBCONFIG],
+	[PKG_CHECK_MODULES(
+		[LIBCONFIG], [libconfig],
+		[AC_DEFINE([ENABLE_LIBCONFIG], [1], [Define to 1 if libconfig is enabled])],
+		[AC_MSG_ERROR([module libconfig not found])],
+	)],
 )
 
 

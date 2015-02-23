@@ -46,6 +46,7 @@ void ouroboros_config_free(struct ouroboros_config *config) {
 	free(config->output_redirect);
 }
 
+#if ENABLE_LIBCONFIG
 /* Internal function which actually reads data from the configuration file. */
 static void _load_config(const config_setting_t *root, struct ouroboros_config *config) {
 
@@ -85,7 +86,9 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 		config->output_redirect = strdup(tmp);
 
 }
+#endif /* ENABLE_LIBCONFIG */
 
+#if ENABLE_LIBCONFIG
 /* Load configuration from the given file. */
 int load_ouroboros_config(const char *filename, const char *appname,
 		struct ouroboros_config *config) {
@@ -131,6 +134,7 @@ int load_ouroboros_config(const char *filename, const char *appname,
 	config_destroy(&cfg);
 	return 0;
 }
+#endif /* ENABLE_LIBCONFIG */
 
 /* Add new pattern to the array. On success this function returns the number
  * of stored elements in the array, otherwise -1. */

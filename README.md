@@ -7,5 +7,5 @@ Instalation
 
 	$ autoreconf --install
 	$ mkdir build && cd build
-	$ ../configure
+	$ ../configure --enable-libconfig
 	$ make && make install
