@@ -12,5 +12,5 @@ ouroboros_SOURCES = \
 ouroboros_CFLAGS = \
 	@LIBCONFIG_CFLAGS@
 
-ouroboros_LDFLAGS = \
+ouroboros_LDADD = \
 	@LIBCONFIG_LIBS@
