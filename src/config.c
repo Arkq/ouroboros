@@ -24,6 +24,7 @@
 /* Initialize configuration structure with default values. */
 void ouroboros_config_init(struct ouroboros_config *config) {
 	config->kill_signal = SIGTERM;
+	config->redirect_output = NULL;
 }
 
 /* Internal function which actually frees array resources. */
@@ -43,7 +44,7 @@ void ouroboros_config_free(struct ouroboros_config *config) {
 	_free_array(config->watch_directory);
 	_free_array(config->pattern_include);
 	_free_array(config->pattern_exclude);
-	free(config->output_redirect);
+	free(config->redirect_output);
 }
 
 #if ENABLE_LIBCONFIG
@@ -53,37 +54,45 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 	config_setting_t *array;
 	const char *tmp;
 	int length;
-	int signal;
+	int val;
 	int i;
 
-	config_setting_lookup_bool(root, OOBSCONF_ADD_NEW_NODES, &config->add_new_nodes);
+	config_setting_lookup_bool(root, OOBSCONF_WATCH_RECURSIVE, &config->watch_recursive);
+	config_setting_lookup_bool(root, OOBSCONF_WATCH_UPDATE_NODES, &config->watch_update_nodes);
 	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_DIRECTORY)) != NULL) {
 		length = config_setting_length(array);
-		for (i = 0; i < length; i--)
+		for (i = 0; i < length; i++)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
 				ouroboros_config_add_pattern(&config->watch_directory, tmp);
 	}
 	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_INCLUDE)) != NULL) {
 		length = config_setting_length(array);
-		for (i = 0; i < length; i--)
+		for (i = 0; i < length; i++)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
 				ouroboros_config_add_pattern(&config->pattern_include, tmp);
 	}
 	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_EXCLUDE)) != NULL) {
 		length = config_setting_length(array);
-		for (i = 0; i < length; i--)
+		for (i = 0; i < length; i++)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
 				ouroboros_config_add_pattern(&config->pattern_exclude, tmp);
 	}
 
 	config_setting_lookup_int(root, OOBSCONF_KILL_LATENCY, &config->kill_latency);
 	if (config_setting_lookup_string(root, OOBSCONF_KILL_SIGNAL, &tmp))
-		if ((signal = ouroboros_config_get_signal(tmp)) != 0)
-			config->kill_signal = signal;
+		if ((val = ouroboros_config_get_signal(tmp)) != 0)
+			config->kill_signal = val;
 
-	config_setting_lookup_bool(root, OOBSCONF_INPUT_PASS_THROUGH, &config->input_pass_through);
-	if (config_setting_lookup_string(root, OOBSCONF_OUTPUT_REDIRECT, &tmp))
-		config->output_redirect = strdup(tmp);
+	config_setting_lookup_bool(root, OOBSCONF_REDIRECT_INPUT, &config->redirect_input);
+
+	/* output setting is a special one, because it can be boolean or string*/
+	if (config_setting_lookup_bool(root, OOBSCONF_REDIRECT_OUTPUT, &val))
+		config->redirect_output = NULL;
+	else if (config_setting_lookup_string(root, OOBSCONF_REDIRECT_OUTPUT, &tmp)) {
+		config->redirect_output = NULL;
+		if (strlen(tmp) != 0)
+			config->redirect_output = strdup(tmp);
+	}
 
 }
 #endif /* ENABLE_LIBCONFIG */

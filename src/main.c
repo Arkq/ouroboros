@@ -27,21 +27,23 @@
 int main(int argc, char **argv) {
 
 	int opt;
-	const char *opts = "hc:n:d:i:e:l:s:p:o:";
+	const char *opts = "hc:d:r:u:i:e:l:k:t:o:s:";
 	struct option longopts[] = {
 		{ "help", no_argument, NULL, 'h' },
 #if ENABLE_LIBCONFIG
 		{ "config", required_argument, NULL, 'c' },
 #endif
 		/* runtime configuration */
-		{ OOBSCONF_ADD_NEW_NODES, required_argument, NULL, 'n' },
 		{ OOBSCONF_WATCH_DIRECTORY, required_argument, NULL, 'd' },
+		{ OOBSCONF_WATCH_RECURSIVE, required_argument, NULL, 'r' },
+		{ OOBSCONF_WATCH_UPDATE_NODES, required_argument, NULL, 'u' },
 		{ OOBSCONF_PATTERN_INCLUDE, required_argument, NULL, 'i' },
 		{ OOBSCONF_PATTERN_EXCLUDE, required_argument, NULL, 'e' },
 		{ OOBSCONF_KILL_LATENCY, required_argument, NULL, 'l' },
-		{ OOBSCONF_KILL_SIGNAL, required_argument, NULL, 's' },
-		{ OOBSCONF_INPUT_PASS_THROUGH, required_argument, NULL, 'p' },
-		{ OOBSCONF_OUTPUT_REDIRECT, required_argument, NULL, 'o' },
+		{ OOBSCONF_KILL_SIGNAL, required_argument, NULL, 'k' },
+		{ OOBSCONF_REDIRECT_INPUT, required_argument, NULL, 't' },
+		{ OOBSCONF_REDIRECT_OUTPUT, required_argument, NULL, 'o' },
+		{ OOBSCONF_REDIRECT_SIGNAL, required_argument, NULL, 's' },
 		{ 0, 0, 0, 0 },
 	};
 
@@ -57,20 +59,24 @@ return_usage:
 #if ENABLE_LIBCONFIG
 					"  -c, --config=FILE\t\tuse this configuration file\n"
 #endif
-					"  -n, --add-new-nodes=BOOL\n"
 					"  -d, --watch-directory=DIR\n"
+					"  -r, --watch-recursive=BOOL\n"
+					"  -u, --watch-update-nodes=BOOL\n"
 					"  -i, --pattern-include=REGEXP\n"
 					"  -e, --pattern-exclude=REGEXP\n"
 					"  -l, --kill-latency=VALUE\n"
-					"  -s, --kill-signal=VALUE\n"
-					"  -p, --input-pass-through=BOOL\n"
-					"  -o, --output-redirect=FILE\n",
+					"  -k, --kill-signal=SIG\n"
+					"  -t, --redirect-input=BOOL\n"
+					"  -o, --redirect-output=FILE\n"
+					"  -s, --redirect-signal=SIG\n",
 					argv[0]);
 			return EXIT_SUCCESS;
 
+#if ENABLE_LIBCONFIG
 		case 'c':
 			config_file = strdup(optarg);
 			break;
+#endif /* ENABLE_LIBCONFIG */
 
 		case '?':
 		case ':':
@@ -82,9 +88,11 @@ return_usage:
 		/* we want to run some command, don't we? */
 		goto return_usage;
 
-	/* load configuration (internal one and from the file) */
+	/* initialize default configuration */
 	ouroboros_config_init(&config);
+
 #if ENABLE_LIBCONFIG
+	/* load configuration from the given file or default one */
 	if (config_file == NULL)
 		config_file = get_ouroboros_config_file();
 	if (load_ouroboros_config(config_file, argv[optind], &config)) {
@@ -97,11 +105,14 @@ return_usage:
 	optind = 0;
 	while ((opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1)
 		switch (opt) {
-		case 'n':
-			config.add_new_nodes = ouroboros_config_get_bool(optarg);
-			break;
 		case 'd':
 			ouroboros_config_add_pattern(&config.watch_directory, optarg);
+			break;
+		case 'r':
+			config.watch_recursive = ouroboros_config_get_bool(optarg);
+			break;
+		case 'u':
+			config.watch_update_nodes = ouroboros_config_get_bool(optarg);
 			break;
 		case 'i':
 			ouroboros_config_add_pattern(&config.pattern_include, optarg);
@@ -112,19 +123,21 @@ return_usage:
 		case 'l':
 			config.kill_latency = strtol(optarg, NULL, 0);
 			break;
-		case 's':
+		case 'k':
 			config.kill_signal = ouroboros_config_get_signal(optarg);
 			if (!config.kill_signal) {
 				fprintf(stderr, "error: unrecognized signal name/value\n");
 				return EXIT_FAILURE;
 			}
 			break;
-		case 'p':
-			config.input_pass_through = ouroboros_config_get_bool(optarg);
+		case 't':
+			config.redirect_input = ouroboros_config_get_bool(optarg);
 			break;
 		case 'o':
-			free(config.output_redirect);
-			config.output_redirect = strdup(optarg);
+			free(config.redirect_output);
+			config.redirect_output = strdup(optarg);
+			break;
+		case 's':
 			break;
 		}
 
@@ -144,12 +157,12 @@ return_usage:
 	ouroboros_notify_watch_directories(&notify, config.watch_directory);
 
 	ouroboros_process_init(&process, argv[optind], &argv[optind]);
-	process.output = config.output_redirect;
+	process.output = config.redirect_output;
 	process.signal = config.kill_signal;
 
 	/* poll standard input - IO redirection */
 	pfds[0].events = POLLIN;
-	pfds[0].fd = config.input_pass_through ? fileno(stdin) : -1;
+	pfds[0].fd = config.redirect_input ? fileno(stdin) : -1;
 
 	/* setup inotify subsystem */
 	pfds[1].events = POLLIN;
@@ -196,13 +209,13 @@ return_usage:
 	kill_ouroboros_process(&process);
 
 	/* get the return value of watched process, if possible */
-	int retval = EXIT_SUCCESS;
+	rv = EXIT_SUCCESS;
 	if (process.status && WIFEXITED(process.status)) {
-		retval = WEXITSTATUS(process.status);
-		debug("process exit status: %d", retval);
+		rv = WEXITSTATUS(process.status);
+		debug("process exit status: %d", rv);
 	}
 
 	ouroboros_process_free(&process);
 	ouroboros_config_free(&config);
-	return retval;
+	return rv;
 }
