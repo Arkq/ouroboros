@@ -136,12 +136,16 @@ return_usage:
 	int timeout;
 	int rv;
 
+	/* it is our crucial subsystem - running without it is pointless */
+	if (ouroboros_notify_init(&notify, config.pattern_include,
+				config.pattern_exclude) == -1)
+		return EXIT_FAILURE;
+
+	ouroboros_notify_watch_directories(&notify, config.watch_directory);
+
 	ouroboros_process_init(&process, argv[optind], &argv[optind]);
 	process.output = config.output_redirect;
 	process.signal = config.kill_signal;
-
-	ouroboros_notify_init(&notify, config.pattern_include, config.pattern_exclude);
-	ouroboros_notify_watch_directories(&notify, config.watch_directory);
 
 	/* poll standard input - IO redirection */
 	pfds[0].events = POLLIN;

@@ -57,12 +57,33 @@ static int _compile_regex(regex_t **array, char **values) {
 	return j;
 }
 
-/* Initialize inotify monitoring subsystem. */
-void ouroboros_notify_init(struct ouroboros_notify *notify,
+/* Initialize inotify monitoring subsystem. If include pattern array is empty
+ * (passed NULL pointer or first element is NULL), then accept-all regexp is
+ * assumed as a sane default. Upon error this function returns -1. */
+int ouroboros_notify_init(struct ouroboros_notify *notify,
 		char **include, char **exclude) {
-	notify->fd = inotify_init1(IN_CLOEXEC);
+
+	char *all[] = { ".*", NULL };
+
+	/* first things first - be sure that *_free will work */
+	notify->pattern_include = NULL;
+	notify->pattern_exclude = NULL;
+	notify->inclpatt_length = 0;
+	notify->exclpatt_length = 0;
+
+	if ((notify->fd = inotify_init1(IN_CLOEXEC)) == -1) {
+		perror("warning: unable to initialize inotify subsystem");
+		return -1;
+	}
+
+	/* set accept-all regexp as a default for include pattern */
+	if (include == NULL || *include == NULL)
+		include = all;
+
 	notify->inclpatt_length = _compile_regex(&notify->pattern_include, include);
 	notify->exclpatt_length = _compile_regex(&notify->pattern_exclude, exclude);
+
+	return 0;
 }
 
 /* Free allocated resources. */

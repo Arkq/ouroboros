@@ -27,7 +27,7 @@ struct ouroboros_notify {
 };
 
 
-void ouroboros_notify_init(struct ouroboros_notify *notify,
+int ouroboros_notify_init(struct ouroboros_notify *notify,
 		char **include, char **exclude);
 void ouroboros_notify_free(struct ouroboros_notify *notify);
 int ouroboros_notify_dispatch(struct ouroboros_notify *notify);
