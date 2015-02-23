@@ -21,35 +21,48 @@
 #include "debug.h"
 
 
-/* Internal function for regexp patterns compilation. On success this function
- * returns the number of compiled patterns, otherwise -1 is returned. */
-int _compile_patterns(regex_t **array, char **patterns) {
+/* Internal function for regex patterns compilation. On success this
+ * function returns the number of compiled patterns. */
+static int _compile_regex(regex_t **array, char **values) {
 
 	int size = 0;
-	int i;
+	int i, j;
 
 	/* count the number of patterns */
-	if (patterns) {
-		char **ptr = patterns;
+	if (values) {
+		char **ptr = values;
 		while (*ptr) {
 			size++;
 			ptr++;
 		}
 	}
 
+	/* allocate memory for all given patters, even though some
+	 * of them might be invalid - we will discard them later */
 	*array = malloc(sizeof(regex_t) * size);
-	for (i = 0; i < size; i++)
-		regcomp(&(*array)[i], patterns[i], REG_EXTENDED | REG_NOSUB);
 
-	return size;
+	for (i = j = 0; i < size; i++, j++) {
+		int rv = regcomp(&(*array)[j], values[i], REG_EXTENDED | REG_NOSUB);
+		if (rv != 0) {
+			/* report compilation error and discard current pattern */
+			int len = regerror(rv, &(*array)[j], NULL, 0);
+			char *msg = malloc(len);
+			regerror(rv, &(*array)[j], msg, len);
+			fprintf(stderr, "warning: invalid pattern '%s': %s\n", values[i], msg);
+			free(msg);
+			j--;
+		}
+	}
+
+	return j;
 }
 
 /* Initialize inotify monitoring subsystem. */
 void ouroboros_notify_init(struct ouroboros_notify *notify,
 		char **include, char **exclude) {
 	notify->fd = inotify_init1(IN_CLOEXEC);
-	notify->inclpatt_length = _compile_patterns(&notify->pattern_include, include);
-	notify->exclpatt_length = _compile_patterns(&notify->pattern_exclude, exclude);
+	notify->inclpatt_length = _compile_regex(&notify->pattern_include, include);
+	notify->exclpatt_length = _compile_regex(&notify->pattern_exclude, exclude);
 }
 
 /* Free allocated resources. */
