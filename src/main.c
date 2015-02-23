@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "debug.h"
 #include "notify.h"
 #include "process.h"
 
@@ -189,8 +190,10 @@ return_usage:
 
 	/* get the return value of watched process, if possible */
 	int retval = EXIT_SUCCESS;
-	if (process.status && WIFEXITED(process.status))
+	if (process.status && WIFEXITED(process.status)) {
 		retval = WEXITSTATUS(process.status);
+		debug("process exit status: %d", retval);
+	}
 
 	ouroboros_process_free(&process);
 	ouroboros_config_free(&config);

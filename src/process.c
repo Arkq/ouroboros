@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 
+#include "debug.h"
+
 
 /* Initialize process structure with default values. */
 void ouroboros_process_init(struct ouroboros_process *process,
@@ -25,7 +27,8 @@ void ouroboros_process_init(struct ouroboros_process *process,
 	process->argv = argv;
 	process->signal = SIGTERM;
 
-	pipe(process->stdinfd);
+	if (pipe(process->stdinfd) == -1)
+		perror("warning: unable to create pipe");
 
 }
 
@@ -37,6 +40,7 @@ void ouroboros_process_free(struct ouroboros_process *process) {
 
 /* Kill running instance of watched process. */
 void kill_ouroboros_process(struct ouroboros_process *process) {
+	debug("killing: pid=%d, signal=%d", process->pid, process->signal);
 	if (process->pid > 0) {
 		if (kill(process->pid, process->signal) == -1)
 			perror("warning: unable to kill process");
@@ -48,8 +52,10 @@ int start_ouroboros_process(struct ouroboros_process *process) {
 
 	if ((process->pid = fork()) == -1)
 		return -1;
-	if (process->pid != 0)
+	if (process->pid != 0) {
+		debug("starting: pid=%d, cmd=%s", process->pid, process->file);
 		return 0;
+	}
 
 	/* setup IO redirections */
 	dup2(process->stdinfd[0], fileno(stdin));

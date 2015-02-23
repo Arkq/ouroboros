@@ -18,6 +18,8 @@
 #include <sys/inotify.h>
 #include <sys/stat.h>
 
+#include "debug.h"
+
 
 /* Initialize inotify monitoring subsystem. */
 void ouroboros_notify_init(struct ouroboros_notify *notify) {
@@ -38,6 +40,7 @@ int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 	ssize_t rlen;
 
 	rlen = read(notify->fd, e, sizeof(buffer));
+	debug("notify event: wd=%d, mask=%x", e->wd, e->mask);
 
 	return 0;
 }
@@ -48,6 +51,7 @@ int ouroboros_notify_watch(struct ouroboros_notify *notify, const char *path) {
 
 	struct stat s;
 
+	debug("adding new path: %s", path);
 	if (stat(path, &s) == -1) {
 		perror("warning: unable to stat pathname");
 		return -1;
@@ -62,6 +66,11 @@ int ouroboros_notify_watch(struct ouroboros_notify *notify, const char *path) {
 		/* iterate over subdirectories */
 		if ((dir = opendir(path)) != NULL) {
 			while ((dp = readdir(dir)) != NULL) {
+
+				/* omit special directories */
+				if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+					continue;
+
 				tmp = malloc(strlen(path) + strlen(dp->d_name) + 2);
 				sprintf(tmp, "%s/%s", path, dp->d_name);
 
