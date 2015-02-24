@@ -23,8 +23,20 @@
 
 /* Initialize configuration structure with default values. */
 void ouroboros_config_init(struct ouroboros_config *config) {
+
+	config->watch_recursive = 0;
+	config->watch_update_nodes = 0;
+	config->watch_paths = NULL;
+	config->watch_includes = NULL;
+	config->watch_excludes = NULL;
+
+	config->kill_latency = 1;
 	config->kill_signal = SIGTERM;
+
+	config->redirect_input = 0;
 	config->redirect_output = NULL;
+	config->redirect_signals = NULL;
+
 }
 
 /* Internal function which actually frees array resources. */
@@ -42,10 +54,11 @@ static void _free_array(char ***array) {
 
 /* Free allocated resources. */
 void ouroboros_config_free(struct ouroboros_config *config) {
-	_free_array(&config->watch_directory);
-	_free_array(&config->pattern_include);
-	_free_array(&config->pattern_exclude);
+	_free_array(&config->watch_paths);
+	_free_array(&config->watch_includes);
+	_free_array(&config->watch_excludes);
 	free(config->redirect_output);
+	free(config->redirect_signals);
 }
 
 #if ENABLE_LIBCONFIG
@@ -59,30 +72,35 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 	int i;
 
 	config_setting_lookup_bool(root, OOBSCONF_WATCH_RECURSIVE, &config->watch_recursive);
+
 	config_setting_lookup_bool(root, OOBSCONF_WATCH_UPDATE_NODES, &config->watch_update_nodes);
-	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_DIRECTORY)) != NULL) {
-		_free_array(&config->watch_directory);
+
+	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_PATH)) != NULL) {
+		_free_array(&config->watch_paths);
 		length = config_setting_length(array);
 		for (i = 0; i < length; i++)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
-				ouroboros_config_add_pattern(&config->watch_directory, tmp);
+				ouroboros_config_add_string(&config->watch_paths, tmp);
 	}
-	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_INCLUDE)) != NULL) {
-		_free_array(&config->pattern_include);
+
+	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_INCLUDE)) != NULL) {
+		_free_array(&config->watch_includes);
 		length = config_setting_length(array);
 		for (i = 0; i < length; i++)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
-				ouroboros_config_add_pattern(&config->pattern_include, tmp);
+				ouroboros_config_add_string(&config->watch_includes, tmp);
 	}
-	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_EXCLUDE)) != NULL) {
-		_free_array(&config->pattern_exclude);
+
+	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_EXCLUDE)) != NULL) {
+		_free_array(&config->watch_excludes);
 		length = config_setting_length(array);
 		for (i = 0; i < length; i++)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
-				ouroboros_config_add_pattern(&config->pattern_exclude, tmp);
+				ouroboros_config_add_string(&config->watch_excludes, tmp);
 	}
 
 	config_setting_lookup_int(root, OOBSCONF_KILL_LATENCY, &config->kill_latency);
+
 	if (config_setting_lookup_string(root, OOBSCONF_KILL_SIGNAL, &tmp))
 		if ((val = ouroboros_config_get_signal(tmp)) != 0)
 			config->kill_signal = val;
@@ -96,6 +114,16 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 		config->redirect_output = NULL;
 		if (strlen(tmp) != 0)
 			config->redirect_output = strdup(tmp);
+	}
+
+	if ((array = config_setting_get_member(root, OOBSCONF_REDIRECT_SIGNAL)) != NULL) {
+		free(config->redirect_signals);
+		config->redirect_signals = NULL;
+		length = config_setting_length(array);
+		for (i = 0; i < length; i++)
+			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
+				if ((val = ouroboros_config_get_signal(tmp)) != 0)
+					ouroboros_config_add_int(&config->redirect_signals, val);
 	}
 
 }
@@ -149,9 +177,35 @@ int load_ouroboros_config(const char *filename, const char *appname,
 }
 #endif /* ENABLE_LIBCONFIG */
 
-/* Add new pattern to the array. On success this function returns the number
+/* Add new non-zero value to the array. On success this function returns
+ * the number of stored elements in the array, otherwise -1. */
+int ouroboros_config_add_int(int **array, int value) {
+
+	if (array == NULL)
+		return -1;
+
+	int size = 2;
+
+	if (*array) {
+		int *ptr = *array;
+		while (ptr) {
+			size++;
+			ptr++;
+		}
+	}
+
+	*array = realloc(*array, size * sizeof(int));
+	if (*array == NULL)
+		return -1;
+
+	(*array)[size - 2] = value;
+	(*array)[size - 1] = 0;
+	return size - 1;
+}
+
+/* Add new value to the array. On success this function returns the number
  * of stored elements in the array, otherwise -1. */
-int ouroboros_config_add_pattern(char ***array, const char *pattern) {
+int ouroboros_config_add_string(char ***array, const char *value) {
 
 	if (array == NULL)
 		return -1;
@@ -171,7 +225,7 @@ int ouroboros_config_add_pattern(char ***array, const char *pattern) {
 	if (*array == NULL)
 		return -1;
 
-	(*array)[size - 2] = strdup(pattern);
+	(*array)[size - 2] = strdup(value);
 	(*array)[size - 1] = NULL;
 	return size - 1;
 }

@@ -27,18 +27,18 @@
 int main(int argc, char **argv) {
 
 	int opt;
-	const char *opts = "hc:d:r:u:i:e:l:k:t:o:s:";
+	const char *opts = "hc:p:r:u:i:e:l:k:t:o:s:";
 	struct option longopts[] = {
 		{ "help", no_argument, NULL, 'h' },
 #if ENABLE_LIBCONFIG
 		{ "config", required_argument, NULL, 'c' },
 #endif
 		/* runtime configuration */
-		{ OOBSCONF_WATCH_DIRECTORY, required_argument, NULL, 'd' },
+		{ OOBSCONF_WATCH_PATH, required_argument, NULL, 'p' },
 		{ OOBSCONF_WATCH_RECURSIVE, required_argument, NULL, 'r' },
 		{ OOBSCONF_WATCH_UPDATE_NODES, required_argument, NULL, 'u' },
-		{ OOBSCONF_PATTERN_INCLUDE, required_argument, NULL, 'i' },
-		{ OOBSCONF_PATTERN_EXCLUDE, required_argument, NULL, 'e' },
+		{ OOBSCONF_WATCH_INCLUDE, required_argument, NULL, 'i' },
+		{ OOBSCONF_WATCH_EXCLUDE, required_argument, NULL, 'e' },
 		{ OOBSCONF_KILL_LATENCY, required_argument, NULL, 'l' },
 		{ OOBSCONF_KILL_SIGNAL, required_argument, NULL, 'k' },
 		{ OOBSCONF_REDIRECT_INPUT, required_argument, NULL, 't' },
@@ -61,11 +61,11 @@ return_usage:
 #if ENABLE_LIBCONFIG
 					"  -c, --config=FILE\t\tuse this configuration file\n"
 #endif
-					"  -d, --watch-directory=DIR\n"
+					"  -p, --watch-path=DIR\n"
 					"  -r, --watch-recursive=BOOL\n"
 					"  -u, --watch-update-nodes=BOOL\n"
-					"  -i, --pattern-include=REGEXP\n"
-					"  -e, --pattern-exclude=REGEXP\n"
+					"  -i, --watch-include=REGEXP\n"
+					"  -e, --watch-exclude=REGEXP\n"
 					"  -l, --kill-latency=VALUE\n"
 					"  -k, --kill-signal=SIG\n"
 					"  -t, --redirect-input=BOOL\n"
@@ -107,8 +107,8 @@ return_usage:
 	optind = 0;
 	while ((opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1)
 		switch (opt) {
-		case 'd':
-			ouroboros_config_add_pattern(&config.watch_directory, optarg);
+		case 'p':
+			ouroboros_config_add_string(&config.watch_paths, optarg);
 			break;
 		case 'r':
 			config.watch_recursive = ouroboros_config_get_bool(optarg);
@@ -117,20 +117,19 @@ return_usage:
 			config.watch_update_nodes = ouroboros_config_get_bool(optarg);
 			break;
 		case 'i':
-			ouroboros_config_add_pattern(&config.pattern_include, optarg);
+			ouroboros_config_add_string(&config.watch_includes, optarg);
 			break;
 		case 'e':
-			ouroboros_config_add_pattern(&config.pattern_exclude, optarg);
+			ouroboros_config_add_string(&config.watch_excludes, optarg);
 			break;
 		case 'l':
 			config.kill_latency = strtol(optarg, NULL, 0);
 			break;
 		case 'k':
-			config.kill_signal = ouroboros_config_get_signal(optarg);
-			if (!config.kill_signal) {
-				fprintf(stderr, "error: unrecognized signal name/value\n");
-				return EXIT_FAILURE;
-			}
+			if ((opt = ouroboros_config_get_signal(optarg)) == 0)
+				fprintf(stderr, "warning: unrecognized signal: %s\n", optarg);
+			else
+				config.kill_signal = opt;
 			break;
 		case 't':
 			config.redirect_input = ouroboros_config_get_bool(optarg);
@@ -140,10 +139,14 @@ return_usage:
 			config.redirect_output = strdup(optarg);
 			break;
 		case 's':
+			if ((opt = ouroboros_config_get_signal(optarg)) == 0)
+				fprintf(stderr, "warning: unrecognized signal: %s\n", optarg);
+			else
+				ouroboros_config_add_int(&config.redirect_signals, opt);
 			break;
 		}
 
-	struct ouroboros_process process = { 0 };
+	struct ouroboros_process process;
 	struct ouroboros_notify notify;
 	struct pollfd pfds[2];
 	char buffer[1024];
@@ -159,11 +162,11 @@ return_usage:
 	if (!config.watch_recursive)
 		config.watch_update_nodes = 0;
 
-	ouroboros_notify_include_patterns(&notify, config.pattern_include);
-	ouroboros_notify_exclude_patterns(&notify, config.pattern_exclude);
+	ouroboros_notify_include_patterns(&notify, config.watch_includes);
+	ouroboros_notify_exclude_patterns(&notify, config.watch_excludes);
 	ouroboros_notify_recursive(&notify, config.watch_recursive);
 	ouroboros_notify_update_nodes(&notify, config.watch_update_nodes);
-	ouroboros_notify_watch_directories(&notify, config.watch_directory);
+	ouroboros_notify_watch_directories(&notify, config.watch_paths);
 
 	ouroboros_process_init(&process, argv[optind], &argv[optind]);
 	process.output = config.redirect_output;
