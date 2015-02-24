@@ -48,7 +48,9 @@ int main(int argc, char **argv) {
 	};
 
 	struct ouroboros_config config = { 0 };
+#if ENABLE_LIBCONFIG
 	char *config_file = NULL;
+#endif
 
 	/* parse options - first pass */
 	while ((opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1)

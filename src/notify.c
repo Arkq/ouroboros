@@ -219,7 +219,7 @@ int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 	rlen = read(notify->fd, e, sizeof(buffer));
 
 	/* we need to read at least the size of the inotify event structure */
-	if (rlen < sizeof(struct inotify_event)) {
+	if (rlen < (signed)sizeof(struct inotify_event)) {
 		fprintf(stderr, "warning: dispatching inotify event failed\n");
 		return -1;
 	}
