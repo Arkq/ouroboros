@@ -18,6 +18,10 @@ struct ouroboros_notify {
 
 	int fd;
 
+	/* scanning behavior */
+	int recursive;
+	int update_nodes;
+
 	/* compiled ERE patterns */
 	regex_t *pattern_include;
 	regex_t *pattern_exclude;
@@ -27,12 +31,18 @@ struct ouroboros_notify {
 };
 
 
-int ouroboros_notify_init(struct ouroboros_notify *notify,
-		char **include, char **exclude);
+int ouroboros_notify_init(struct ouroboros_notify *notify);
 void ouroboros_notify_free(struct ouroboros_notify *notify);
-int ouroboros_notify_dispatch(struct ouroboros_notify *notify);
+
+int ouroboros_notify_include_patterns(struct ouroboros_notify *notify, char **values);
+int ouroboros_notify_exclude_patterns(struct ouroboros_notify *notify, char **values);
+int ouroboros_notify_recursive(struct ouroboros_notify *notify, int value);
+int ouroboros_notify_update_nodes(struct ouroboros_notify *notify, int value);
+
 int ouroboros_notify_watch(struct ouroboros_notify *notify, const char *path);
 int ouroboros_notify_watch_directories(struct ouroboros_notify *notify,
 		char *const *dirs);
+
+int ouroboros_notify_dispatch(struct ouroboros_notify *notify);
 
 #endif

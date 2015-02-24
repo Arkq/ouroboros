@@ -21,6 +21,44 @@
 #include "debug.h"
 
 
+/* Initialize inotify monitoring subsystem. Upon error this function
+ * returns -1. */
+int ouroboros_notify_init(struct ouroboros_notify *notify) {
+
+	/* first things first - be sure that *_free will work */
+	notify->pattern_include = NULL;
+	notify->pattern_exclude = NULL;
+	notify->inclpatt_length = 0;
+	notify->exclpatt_length = 0;
+
+	/* set defaults for directory watching */
+	notify->recursive = 1;
+	notify->update_nodes = 1;
+
+	if ((notify->fd = inotify_init1(IN_CLOEXEC)) == -1) {
+		perror("warning: unable to initialize inotify subsystem");
+		return -1;
+	}
+
+	return 0;
+}
+
+/* Free allocated resources. */
+void ouroboros_notify_free(struct ouroboros_notify *notify) {
+
+	int i;
+
+	for (i = 0; i < notify->inclpatt_length; i++)
+		regfree(&notify->pattern_include[i]);
+	for (i = 0; i < notify->exclpatt_length; i++)
+		regfree(&notify->pattern_include[i]);
+
+	free(notify->pattern_include);
+	free(notify->pattern_exclude);
+
+	close(notify->fd);
+}
+
 /* Internal function for regex patterns compilation. On success this
  * function returns the number of compiled patterns. */
 static int _compile_regex(regex_t **array, char **values) {
@@ -57,75 +95,42 @@ static int _compile_regex(regex_t **array, char **values) {
 	return j;
 }
 
-/* Initialize inotify monitoring subsystem. If include pattern array is empty
- * (passed NULL pointer or first element is NULL), then accept-all regexp is
- * assumed as a sane default. Upon error this function returns -1. */
-int ouroboros_notify_init(struct ouroboros_notify *notify,
-		char **include, char **exclude) {
+/* Set include pattern values. If given array is empty (passed NULL pointer
+ * or first element is NULL), then accept-all regexp is assumed as a sane
+ * default. This function returns the number of processed patterns. */
+int ouroboros_notify_include_patterns(struct ouroboros_notify *notify, char **values) {
 
 	char *all[] = { ".*", NULL };
 
-	/* first things first - be sure that *_free will work */
-	notify->pattern_include = NULL;
-	notify->pattern_exclude = NULL;
-	notify->inclpatt_length = 0;
-	notify->exclpatt_length = 0;
-
-	if ((notify->fd = inotify_init1(IN_CLOEXEC)) == -1) {
-		perror("warning: unable to initialize inotify subsystem");
-		return -1;
-	}
-
 	/* set accept-all regexp as a default for include pattern */
-	if (include == NULL || *include == NULL)
-		include = all;
+	if (values == NULL || *values == NULL)
+		values = all;
 
-	notify->inclpatt_length = _compile_regex(&notify->pattern_include, include);
-	notify->exclpatt_length = _compile_regex(&notify->pattern_exclude, exclude);
-
-	return 0;
+	notify->inclpatt_length = _compile_regex(&notify->pattern_include, values);
+	return notify->inclpatt_length;
 }
 
-/* Free allocated resources. */
-void ouroboros_notify_free(struct ouroboros_notify *notify) {
-
-	int i;
-
-	for (i = 0; i < notify->inclpatt_length; i++)
-		regfree(&notify->pattern_include[i]);
-	for (i = 0; i < notify->exclpatt_length; i++)
-		regfree(&notify->pattern_include[i]);
-
-	free(notify->pattern_include);
-	free(notify->pattern_exclude);
-
-	close(notify->fd);
+/* Set exclude pattern values. This function returns the number of
+ * successfully processed patterns. */
+int ouroboros_notify_exclude_patterns(struct ouroboros_notify *notify, char **values) {
+	notify->exclpatt_length = _compile_regex(&notify->pattern_exclude, values);
+	return notify->exclpatt_length;
 }
 
-/* Dispatch notification event and optionally add new directories into the
- * monitoring subsystem. If current event matches given patterns, then this
- * function returns 1. Upon error this function returns -1. */
-int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
+/* Enable or disable recursive directory scanning upon adding new nodes to
+ * the monitoring subsystem. This function returns previous value. */
+int ouroboros_notify_recursive(struct ouroboros_notify *notify, int value) {
+	int tmp = notify->recursive;
+	notify->recursive = value;
+	return tmp;
+}
 
-	char buffer[sizeof(struct inotify_event) + NAME_MAX + 1];
-	struct inotify_event *e = (struct inotify_event *)buffer;
-	ssize_t rlen;
-	int i;
-
-	rlen = read(notify->fd, e, sizeof(buffer));
-	debug("notify event: wd=%d, mask=%x, name=%s", e->wd, e->mask, e->name);
-
-	/* check the name against include patterns, if matched, then check against
-	 * exclude patterns - exclude takes precedence over include */
-	for (i = 0; i < notify->inclpatt_length; i++)
-		if (regexec(&notify->pattern_include[i], e->name, 0, NULL, 0) == 0) {
-			for (i = 0; i < notify->exclpatt_length; i++)
-				if (regexec(&notify->pattern_exclude[i], e->name, 0, NULL, 0) == 0)
-					return 0;
-			return 1;
-		}
-
-	return 0;
+/* Enable or disable updating nodes upon event dispatching. This function
+ * returns previous value. */
+int ouroboros_notify_update_nodes(struct ouroboros_notify *notify, int value) {
+	int tmp = notify->update_nodes;
+	notify->update_nodes = value;
+	return tmp;
 }
 
 /* Add given location with all subdirectories into the inotify monitoring
@@ -140,7 +145,8 @@ int ouroboros_notify_watch(struct ouroboros_notify *notify, const char *path) {
 		return -1;
 	}
 
-	if (S_ISDIR(s.st_mode)) {
+	/* go into the recursive mode - if enabled */
+	if (notify->recursive && S_ISDIR(s.st_mode)) {
 
 		DIR *dir;
 		struct dirent *dp;
@@ -196,6 +202,44 @@ int ouroboros_notify_watch_directories(struct ouroboros_notify *notify,
 		ouroboros_notify_watch(notify, *dirs);
 		dirs++;
 	}
+
+	return 0;
+}
+
+/* Dispatch notification event and optionally add new directories into the
+ * monitoring subsystem. If current event matches given patterns, then this
+ * function returns 1. Upon error this function returns -1. */
+int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
+
+	char buffer[sizeof(struct inotify_event) + NAME_MAX + 1];
+	struct inotify_event *e = (struct inotify_event *)buffer;
+	ssize_t rlen;
+	int i;
+
+	rlen = read(notify->fd, e, sizeof(buffer));
+
+	/* we need to read at least the size of the inotify event structure */
+	if (rlen < sizeof(struct inotify_event)) {
+		fprintf(stderr, "warning: dispatching inotify event failed\n");
+		return -1;
+	}
+
+	debug("notify event: wd=%d, mask=%x, name=%s", e->wd, e->mask, e->name);
+
+	/* update new nodes - directory created or permission changed */
+	if (notify->update_nodes && e->mask & IN_ISDIR && e->mask & (IN_CREATE | IN_ATTRIB)) {
+		debug("add new node: not implemented yet...");
+	}
+
+	/* check the name against include patterns, if matched, then check against
+	 * exclude patterns - exclude takes precedence over include */
+	for (i = 0; i < notify->inclpatt_length; i++)
+		if (regexec(&notify->pattern_include[i], e->name, 0, NULL, 0) == 0) {
+			for (i = 0; i < notify->exclpatt_length; i++)
+				if (regexec(&notify->pattern_exclude[i], e->name, 0, NULL, 0) == 0)
+					return 0;
+			return 1;
+		}
 
 	return 0;
 }

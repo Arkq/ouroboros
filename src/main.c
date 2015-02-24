@@ -142,7 +142,7 @@ return_usage:
 		}
 
 	struct ouroboros_process process = { 0 };
-	struct ouroboros_notify notify = { 0 };
+	struct ouroboros_notify notify;
 	struct pollfd pfds[2];
 	char buffer[1024];
 	int restart;
@@ -150,10 +150,17 @@ return_usage:
 	int rv;
 
 	/* it is our crucial subsystem - running without it is pointless */
-	if (ouroboros_notify_init(&notify, config.pattern_include,
-				config.pattern_exclude) == -1)
+	if (ouroboros_notify_init(&notify) == -1)
 		return EXIT_FAILURE;
 
+	/* non-recursive mode implicitly excludes updates */
+	if (!config.watch_recursive)
+		config.watch_update_nodes = 0;
+
+	ouroboros_notify_include_patterns(&notify, config.pattern_include);
+	ouroboros_notify_exclude_patterns(&notify, config.pattern_exclude);
+	ouroboros_notify_recursive(&notify, config.watch_recursive);
+	ouroboros_notify_update_nodes(&notify, config.watch_update_nodes);
 	ouroboros_notify_watch_directories(&notify, config.watch_directory);
 
 	ouroboros_process_init(&process, argv[optind], &argv[optind]);
@@ -182,7 +189,7 @@ return_usage:
 		}
 
 		if ((rv = poll(pfds, 2, timeout)) == -1)
-			break;  /* signal interruption */
+			break; /* signal interruption */
 
 		/* maintain kill latency */
 		if (rv == 0) {
@@ -215,6 +222,7 @@ return_usage:
 		debug("process exit status: %d", rv);
 	}
 
+	ouroboros_notify_free(&notify);
 	ouroboros_process_free(&process);
 	ouroboros_config_free(&config);
 	return rv;
