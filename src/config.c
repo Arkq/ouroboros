@@ -28,22 +28,23 @@ void ouroboros_config_init(struct ouroboros_config *config) {
 }
 
 /* Internal function which actually frees array resources. */
-static void _free_array(char **array) {
-	char **ptr = array;
-	if (ptr) {
+static void _free_array(char ***array) {
+	if (*array) {
+		char **ptr = *array;
 		while (*ptr) {
 			free(*ptr);
 			ptr++;
 		}
-		free(ptr);
+		free(*array);
+		*array = NULL;
 	}
 }
 
 /* Free allocated resources. */
 void ouroboros_config_free(struct ouroboros_config *config) {
-	_free_array(config->watch_directory);
-	_free_array(config->pattern_include);
-	_free_array(config->pattern_exclude);
+	_free_array(&config->watch_directory);
+	_free_array(&config->pattern_include);
+	_free_array(&config->pattern_exclude);
 	free(config->redirect_output);
 }
 
@@ -60,18 +61,21 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 	config_setting_lookup_bool(root, OOBSCONF_WATCH_RECURSIVE, &config->watch_recursive);
 	config_setting_lookup_bool(root, OOBSCONF_WATCH_UPDATE_NODES, &config->watch_update_nodes);
 	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_DIRECTORY)) != NULL) {
+		_free_array(&config->watch_directory);
 		length = config_setting_length(array);
 		for (i = 0; i < length; i++)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
 				ouroboros_config_add_pattern(&config->watch_directory, tmp);
 	}
 	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_INCLUDE)) != NULL) {
+		_free_array(&config->pattern_include);
 		length = config_setting_length(array);
 		for (i = 0; i < length; i++)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
 				ouroboros_config_add_pattern(&config->pattern_include, tmp);
 	}
 	if ((array = config_setting_get_member(root, OOBSCONF_PATTERN_EXCLUDE)) != NULL) {
+		_free_array(&config->pattern_exclude);
 		length = config_setting_length(array);
 		for (i = 0; i < length; i++)
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
