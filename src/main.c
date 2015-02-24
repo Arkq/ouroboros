@@ -14,6 +14,7 @@
 
 #include <getopt.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +24,33 @@
 #include "notify.h"
 #include "process.h"
 
+
+/* Global variable and handler (callback) for signal redirections. */
+static pid_t sr_pid = 0;
+static void sr_handler(int sig) {
+	debug("redirecting signal: %d", sig);
+	if (sr_pid)
+		kill(sr_pid, sig);
+}
+
+/* Initialize signal redirections. Note, that not all signals can be
+ * caught and therefore redirected. This restriction is beyond our
+ * power, so we will simply show appropriate warning in such cases. */
+static void setup_signals(int *signals) {
+
+	if (signals == NULL)
+		return;
+
+	struct sigaction sigact = { 0 };
+	sigact.sa_handler = sr_handler;
+
+	while (*signals) {
+		if (sigaction(*signals, &sigact, NULL) == -1)
+			perror("warning: unable to install signal handler");
+		signals++;
+	}
+
+}
 
 int main(int argc, char **argv) {
 
@@ -172,6 +200,9 @@ return_usage:
 	process.output = config.redirect_output;
 	process.signal = config.kill_signal;
 
+	/* set up signal redirections */
+	setup_signals(config.redirect_signals);
+
 	/* poll standard input - IO redirection */
 	pfds[0].events = POLLIN;
 	pfds[0].fd = config.redirect_input ? fileno(stdin) : -1;
@@ -191,10 +222,14 @@ return_usage:
 				fprintf(stderr, "error: process starting failed\n");
 				return EXIT_FAILURE;
 			}
+			/* update pid for signal redirection */
+			sr_pid = process.pid;
 		}
 
-		if ((rv = poll(pfds, 2, timeout)) == -1)
-			break; /* signal interruption */
+		if ((rv = poll(pfds, 2, timeout)) == -1) {
+			debug("poll: signal interruption");
+			break;
+		}
 
 		/* maintain kill latency */
 		if (rv == 0) {
