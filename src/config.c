@@ -188,7 +188,7 @@ int ouroboros_config_add_int(int **array, int value) {
 
 	if (*array) {
 		int *ptr = *array;
-		while (ptr) {
+		while (*ptr) {
 			size++;
 			ptr++;
 		}

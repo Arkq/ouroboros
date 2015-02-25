@@ -12,6 +12,7 @@
 #include "../config.h"
 #endif
 
+#include <errno.h>
 #include <getopt.h>
 #include <poll.h>
 #include <signal.h>
@@ -227,7 +228,10 @@ return_usage:
 		}
 
 		if ((rv = poll(pfds, 2, timeout)) == -1) {
-			debug("poll: signal interruption");
+			if (errno == EINTR)
+				/* signal interruption, not a big deal */
+				continue;
+			perror("error: poll failed");
 			break;
 		}
 
