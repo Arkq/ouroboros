@@ -36,7 +36,7 @@ struct ouroboros_config {
 	char **watch_excludes;
 
 	/* kill and reload */
-	int kill_latency;
+	double kill_latency;
 	int kill_signal;
 
 	/* IO redirection */

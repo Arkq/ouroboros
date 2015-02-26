@@ -152,7 +152,7 @@ return_usage:
 			ouroboros_config_add_string(&config.watch_excludes, optarg);
 			break;
 		case 'l':
-			config.kill_latency = strtol(optarg, NULL, 0);
+			config.kill_latency = strtod(optarg, NULL);
 			break;
 		case 'k':
 			if ((opt = ouroboros_config_get_signal(optarg)) == 0)

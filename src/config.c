@@ -99,7 +99,7 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 				ouroboros_config_add_string(&config->watch_excludes, tmp);
 	}
 
-	config_setting_lookup_int(root, OOBSCONF_KILL_LATENCY, &config->kill_latency);
+	config_setting_lookup_float(root, OOBSCONF_KILL_LATENCY, &config->kill_latency);
 
 	if (config_setting_lookup_string(root, OOBSCONF_KILL_SIGNAL, &tmp))
 		if ((val = ouroboros_config_get_signal(tmp)) != 0)
