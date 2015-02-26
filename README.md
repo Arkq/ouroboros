@@ -1,5 +1,22 @@
-ouroboros - Ongoing Build Assistant
+Ouroboros - Ongoing Build Assistant
 ===================================
+
+Developing (building) service-based systems might be really painful, especially when it comes to
+testing. In the most strict scenario you will need running server instance, and every time new
+code is deployed you will have to restart it. If you are using some framework, this task is
+probably done for you automatically. But what if you grew out of frameworks and to-do list apps,
+and want to make something for yourself. So in this case you have to make your own developing
+environment - service reloading and crash maintaining.
+
+Recently, I was put in such a situation and after a while I was shocked, that there is no black
+box like solution for this. There is a framework way or the highway - simply put, you are out of
+luck.
+
+This project aims to fill this gap. Ouroboros is nothing more but a simple tool which will restart
+any application after some watched file has been modified. So now you can skip the part with
+developing your own reloading mechanism, and focus on more important things like what you've
+wanted to do in the first place. Besides, unless you are creating some AI thingy, you won't need
+any development related tools in you final product, will you?
 
 
 Installation
