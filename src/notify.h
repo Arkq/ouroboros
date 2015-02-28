@@ -28,6 +28,10 @@ struct ouroboros_notify {
 	int inclpatt_length;
 	int exclpatt_length;
 
+	/* internal filenames tracking */
+	char **paths;
+	int path_max;
+
 };
 
 

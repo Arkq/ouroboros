@@ -25,11 +25,13 @@
  * returns -1. */
 int ouroboros_notify_init(struct ouroboros_notify *notify) {
 
-	/* first things first - be sure that *_free will work */
 	notify->pattern_include = NULL;
 	notify->pattern_exclude = NULL;
 	notify->inclpatt_length = 0;
 	notify->exclpatt_length = 0;
+
+	notify->paths = NULL;
+	notify->path_max = 0;
 
 	/* set defaults for directory watching */
 	notify->recursive = 1;
@@ -50,11 +52,15 @@ void ouroboros_notify_free(struct ouroboros_notify *notify) {
 
 	for (i = 0; i < notify->inclpatt_length; i++)
 		regfree(&notify->pattern_include[i]);
+	free(notify->pattern_include);
+
 	for (i = 0; i < notify->exclpatt_length; i++)
 		regfree(&notify->pattern_include[i]);
-
-	free(notify->pattern_include);
 	free(notify->pattern_exclude);
+
+	for (i = 0; i < notify->path_max; i++)
+		free(notify->paths[i]);
+	free(notify->paths);
 
 	close(notify->fd);
 }
@@ -138,6 +144,7 @@ int ouroboros_notify_update_nodes(struct ouroboros_notify *notify, int value) {
 int ouroboros_notify_watch(struct ouroboros_notify *notify, const char *path) {
 
 	struct stat s;
+	int wd;
 
 	debug("adding new path: %s", path);
 	if (stat(path, &s) == -1) {
@@ -174,8 +181,22 @@ int ouroboros_notify_watch(struct ouroboros_notify *notify, const char *path) {
 	}
 
 	/* add file/directory to the monitoring subsystem */
-	if (inotify_add_watch(notify->fd, path, IN_ATTRIB | IN_CREATE |
-				IN_DELETE | IN_MODIFY | IN_MOVE_SELF) == -1)
+	if ((wd = inotify_add_watch(notify->fd, path, IN_ATTRIB | IN_CREATE |
+				IN_DELETE | IN_CLOSE_WRITE | IN_MOVE_SELF)) != -1) {
+
+		if (wd >= notify->path_max) {
+			int i;
+			notify->paths = realloc(notify->paths, sizeof(char *) * (wd + 1));
+			for (i = notify->path_max; i <= wd; i++)
+				notify->paths[i] = NULL;
+			notify->path_max = wd + 1;
+		}
+
+		/* store full path of watched location */
+		notify->paths[wd] = strdup(path);
+
+	}
+	else
 		perror("warning: unable to add inotify watch");
 
 	return 0;
@@ -228,7 +249,10 @@ int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 
 	/* update new nodes - directory created or permission changed */
 	if (notify->update_nodes && e->mask & IN_ISDIR && e->mask & (IN_CREATE | IN_ATTRIB)) {
-		debug("add new node: not implemented yet...");
+		char *tmp = malloc(strlen(notify->paths[e->wd]) + strlen(e->name) + 2);
+		sprintf(tmp, "%s/%s", notify->paths[e->wd], e->name);
+		ouroboros_notify_watch(notify, tmp);
+		free(tmp);
 	}
 
 	/* check the name against include patterns, if matched, then check against
