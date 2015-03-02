@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
 		switch (opt) {
 		case 'h':
 return_usage:
-			printf("usage: %s [options] <command ...>\n"
+			printf("usage: %s [options] [--] <command ...>\n"
 #if ENABLE_LIBCONFIG
 					"  -c, --config=FILE\t\tuse this configuration file\n"
 #endif
