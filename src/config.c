@@ -18,7 +18,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#if ENABLE_LIBCONFIG
 #include <libconfig.h>
+#endif
 
 
 /* Initialize configuration structure with default values. */
