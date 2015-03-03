@@ -176,7 +176,7 @@ return_usage:
 		}
 
 	struct ouroboros_process process;
-	struct ouroboros_notify notify;
+	struct ouroboros_notify *notify;
 	struct pollfd pfds[2];
 	char buffer[1024];
 	int restart;
@@ -184,18 +184,18 @@ return_usage:
 	int rv;
 
 	/* it is our crucial subsystem - running without it is pointless */
-	if (ouroboros_notify_init(&notify) == -1)
+	if ((notify = ouroboros_notify_init(ONT_INOTIFY)) == NULL)
 		return EXIT_FAILURE;
 
 	/* non-recursive mode implicitly excludes updates */
 	if (!config.watch_recursive)
 		config.watch_update_nodes = 0;
 
-	ouroboros_notify_include_patterns(&notify, config.watch_includes);
-	ouroboros_notify_exclude_patterns(&notify, config.watch_excludes);
-	ouroboros_notify_recursive(&notify, config.watch_recursive);
-	ouroboros_notify_update_nodes(&notify, config.watch_update_nodes);
-	ouroboros_notify_watch_directories(&notify, config.watch_paths);
+	ouroboros_notify_recursive(notify, config.watch_recursive);
+	ouroboros_notify_update_nodes(notify, config.watch_update_nodes);
+	ouroboros_notify_include_patterns(notify, config.watch_includes);
+	ouroboros_notify_exclude_patterns(notify, config.watch_excludes);
+	ouroboros_notify_watch(notify, config.watch_paths);
 
 	ouroboros_process_init(&process, argv[optind], &argv[optind]);
 	process.output = config.redirect_output;
@@ -210,7 +210,7 @@ return_usage:
 
 	/* setup inotify subsystem */
 	pfds[1].events = POLLIN;
-	pfds[1].fd = notify.fd;
+	pfds[1].fd = notify->s.inotify.fd;
 
 	/* run main maintenance loop */
 	for (restart = 1;;) {
@@ -250,7 +250,7 @@ return_usage:
 
 		/* dispatch notification event */
 		if (pfds[1].revents & POLLIN) {
-			if (ouroboros_notify_dispatch(&notify) == 1)
+			if (ouroboros_notify_dispatch(notify) == 1)
 				timeout = config.kill_latency * 1000;
 		}
 
@@ -266,7 +266,7 @@ return_usage:
 		debug("process exit status: %d", rv);
 	}
 
-	ouroboros_notify_free(&notify);
+	ouroboros_notify_free(notify);
 	ouroboros_process_free(&process);
 	ouroboros_config_free(&config);
 	return rv;
