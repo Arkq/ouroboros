@@ -34,8 +34,11 @@ struct ouroboros_notify_data_inotify {
 	/* inotify file descriptor */
 	int fd;
 	/* internal filenames tracking */
-	char **paths;
-	int path_max;
+	struct {
+		int wd;
+		char *path;
+	} *watched;
+	int size;
 };
 
 

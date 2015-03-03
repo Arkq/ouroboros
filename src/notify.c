@@ -57,8 +57,8 @@ struct ouroboros_notify *ouroboros_notify_init(enum ouroboros_notify_type type) 
 			free(notify);
 			return NULL;
 		}
-		notify->s.inotify.paths = NULL;
-		notify->s.inotify.path_max = 0;
+		notify->s.inotify.watched = NULL;
+		notify->s.inotify.size = 0;
 		break;
 #endif /* HAVE_SYS_INOTIFY_H */
 	}
@@ -82,9 +82,9 @@ void ouroboros_notify_free(struct ouroboros_notify *notify) {
 		break;
 #if HAVE_SYS_INOTIFY_H
 	case ONT_INOTIFY:
-		while (notify->s.inotify.path_max--)
-			free(notify->s.inotify.paths[notify->s.inotify.path_max]);
-		free(notify->s.inotify.paths);
+		while (notify->s.inotify.size--)
+			free(notify->s.inotify.watched[notify->s.inotify.size].path);
+		free(notify->s.inotify.watched);
 		close(notify->s.inotify.fd);
 		break;
 #endif /* HAVE_SYS_INOTIFY_H */
@@ -239,6 +239,7 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 	case ONT_INOTIFY:
 		{
 			int wd;
+			int i;
 
 			/* add file/directory to the monitoring subsystem */
 			if ((wd = inotify_add_watch(notify->s.inotify.fd, path, IN_ATTRIB |
@@ -246,16 +247,19 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 				perror("warning: unable to add inotify watch");
 			else {
 
-				if (wd >= notify->s.inotify.path_max) {
-					int i;
-					notify->s.inotify.paths = realloc(notify->s.inotify.paths, sizeof(char *) * (wd + 1));
-					for (i = notify->s.inotify.path_max; i <= wd; i++)
-						notify->s.inotify.paths[i] = NULL;
-					notify->s.inotify.path_max = wd + 1;
-				}
+				/* check for already stored watch descriptor */
+				for (i = notify->s.inotify.size; i; i--)
+					if (notify->s.inotify.watched[i - 1].wd == wd)
+						break;
 
-				/* store full path of watched location */
-				notify->s.inotify.paths[wd] = strdup(path);
+				/* add new watched location (full patch) */
+				if (!i) {
+					notify->s.inotify.size++;
+					notify->s.inotify.watched = realloc(notify->s.inotify.watched,
+							sizeof(*notify->s.inotify.watched) * notify->s.inotify.size);
+					notify->s.inotify.watched[notify->s.inotify.size - 1].wd = wd;
+					notify->s.inotify.watched[notify->s.inotify.size - 1].path = strdup(path);
+				}
 
 			}
 		}
@@ -313,10 +317,31 @@ int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 
 			/* update new nodes - directory created or permission changed */
 			if (notify->update_nodes && e->mask & IN_ISDIR && e->mask & (IN_CREATE | IN_ATTRIB)) {
-				char *tmp = malloc(strlen(notify->s.inotify.paths[e->wd]) + strlen(e->name) + 2);
-				sprintf(tmp, "%s/%s", notify->s.inotify.paths[e->wd], e->name);
+
+				/* get the index of watch descriptor from the current event */
+				i = notify->s.inotify.size;
+				while (i && notify->s.inotify.watched[--i].wd != e->wd);
+
+				char *tmp = malloc(strlen(notify->s.inotify.watched[i].path) + strlen(e->name) + 2);
+				sprintf(tmp, "%s/%s", notify->s.inotify.watched[i].path, e->name);
 				ouroboros_notify_watch_path(notify, tmp);
 				free(tmp);
+
+			}
+			/* delete node - it seems that the path has been deleted */
+			else if (e->mask & IN_IGNORED) {
+
+				/* get the index of watch descriptor from the current event */
+				i = notify->s.inotify.size;
+				while (i && notify->s.inotify.watched[--i].wd != e->wd);
+
+				notify->s.inotify.size--;
+				free(notify->s.inotify.watched[i].path);
+				if (notify->s.inotify.size)
+					memcpy(&notify->s.inotify.watched[i],
+							&notify->s.inotify.watched[notify->s.inotify.size],
+							sizeof(*notify->s.inotify.watched));
+
 			}
 
 			return _check_patterns(notify, e->name);
