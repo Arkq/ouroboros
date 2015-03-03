@@ -73,11 +73,11 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 	int val;
 	int i;
 
-	config_setting_lookup_bool(root, OOBSCONF_WATCH_RECURSIVE, &config->watch_recursive);
+	config_setting_lookup_bool(root, OCKD_WATCH_RECURSIVE, &config->watch_recursive);
 
-	config_setting_lookup_bool(root, OOBSCONF_WATCH_UPDATE_NODES, &config->watch_update_nodes);
+	config_setting_lookup_bool(root, OCKD_WATCH_UPDATE_NODES, &config->watch_update_nodes);
 
-	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_PATH)) != NULL) {
+	if ((array = config_setting_get_member(root, OCKD_WATCH_PATH)) != NULL) {
 		_free_array(&config->watch_paths);
 		length = config_setting_length(array);
 		for (i = 0; i < length; i++)
@@ -85,7 +85,7 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 				ouroboros_config_add_string(&config->watch_paths, tmp);
 	}
 
-	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_INCLUDE)) != NULL) {
+	if ((array = config_setting_get_member(root, OCKD_WATCH_INCLUDE)) != NULL) {
 		_free_array(&config->watch_includes);
 		length = config_setting_length(array);
 		for (i = 0; i < length; i++)
@@ -93,7 +93,7 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 				ouroboros_config_add_string(&config->watch_includes, tmp);
 	}
 
-	if ((array = config_setting_get_member(root, OOBSCONF_WATCH_EXCLUDE)) != NULL) {
+	if ((array = config_setting_get_member(root, OCKD_WATCH_EXCLUDE)) != NULL) {
 		_free_array(&config->watch_excludes);
 		length = config_setting_length(array);
 		for (i = 0; i < length; i++)
@@ -101,24 +101,24 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 				ouroboros_config_add_string(&config->watch_excludes, tmp);
 	}
 
-	config_setting_lookup_float(root, OOBSCONF_KILL_LATENCY, &config->kill_latency);
+	config_setting_lookup_float(root, OCKD_KILL_LATENCY, &config->kill_latency);
 
-	if (config_setting_lookup_string(root, OOBSCONF_KILL_SIGNAL, &tmp))
+	if (config_setting_lookup_string(root, OCKD_KILL_SIGNAL, &tmp))
 		if ((val = ouroboros_config_get_signal(tmp)) != 0)
 			config->kill_signal = val;
 
-	config_setting_lookup_bool(root, OOBSCONF_REDIRECT_INPUT, &config->redirect_input);
+	config_setting_lookup_bool(root, OCKD_REDIRECT_INPUT, &config->redirect_input);
 
 	/* output setting is a special one, because it can be boolean or string*/
-	if (config_setting_lookup_bool(root, OOBSCONF_REDIRECT_OUTPUT, &val))
+	if (config_setting_lookup_bool(root, OCKD_REDIRECT_OUTPUT, &val))
 		config->redirect_output = NULL;
-	else if (config_setting_lookup_string(root, OOBSCONF_REDIRECT_OUTPUT, &tmp)) {
+	else if (config_setting_lookup_string(root, OCKD_REDIRECT_OUTPUT, &tmp)) {
 		config->redirect_output = NULL;
 		if (strlen(tmp) != 0)
 			config->redirect_output = strdup(tmp);
 	}
 
-	if ((array = config_setting_get_member(root, OOBSCONF_REDIRECT_SIGNAL)) != NULL) {
+	if ((array = config_setting_get_member(root, OCKD_REDIRECT_SIGNAL)) != NULL) {
 		free(config->redirect_signals);
 		config->redirect_signals = NULL;
 		length = config_setting_length(array);
@@ -164,7 +164,7 @@ int load_ouroboros_config(const char *filename, const char *appname,
 
 		if (!config_setting_is_group(extra))
 			continue;
-		if (!config_setting_lookup_string(extra, OOBSCONF_APP_FILENAME, &tmp))
+		if (!config_setting_lookup_string(extra, OCKD_APP_FILENAME, &tmp))
 			continue;
 		if (strcmp(tmp, appname) != 0)
 			continue;

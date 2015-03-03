@@ -13,17 +13,17 @@
 
 
 /* key definitions for configuration file */
-#define OOBSCONF_APP_FILENAME "filename"
-#define OOBSCONF_WATCH_PATH "watch-path"
-#define OOBSCONF_WATCH_RECURSIVE "watch-recursive"
-#define OOBSCONF_WATCH_UPDATE_NODES "watch-update-nodes"
-#define OOBSCONF_WATCH_INCLUDE "watch-include"
-#define OOBSCONF_WATCH_EXCLUDE "watch-exclude"
-#define OOBSCONF_KILL_LATENCY "kill-latency"
-#define OOBSCONF_KILL_SIGNAL "kill-signal"
-#define OOBSCONF_REDIRECT_INPUT "redirect-input"
-#define OOBSCONF_REDIRECT_OUTPUT "redirect-output"
-#define OOBSCONF_REDIRECT_SIGNAL "redirect-signal"
+#define OCKD_APP_FILENAME "filename"
+#define OCKD_WATCH_PATH "watch-path"
+#define OCKD_WATCH_RECURSIVE "watch-recursive"
+#define OCKD_WATCH_UPDATE_NODES "watch-update-nodes"
+#define OCKD_WATCH_INCLUDE "watch-include"
+#define OCKD_WATCH_EXCLUDE "watch-exclude"
+#define OCKD_KILL_LATENCY "kill-latency"
+#define OCKD_KILL_SIGNAL "kill-signal"
+#define OCKD_REDIRECT_INPUT "redirect-input"
+#define OCKD_REDIRECT_OUTPUT "redirect-output"
+#define OCKD_REDIRECT_SIGNAL "redirect-signal"
 
 
 struct ouroboros_config {

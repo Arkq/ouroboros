@@ -63,16 +63,16 @@ int main(int argc, char **argv) {
 		{ "config", required_argument, NULL, 'c' },
 #endif
 		/* runtime configuration */
-		{ OOBSCONF_WATCH_PATH, required_argument, NULL, 'p' },
-		{ OOBSCONF_WATCH_RECURSIVE, required_argument, NULL, 'r' },
-		{ OOBSCONF_WATCH_UPDATE_NODES, required_argument, NULL, 'u' },
-		{ OOBSCONF_WATCH_INCLUDE, required_argument, NULL, 'i' },
-		{ OOBSCONF_WATCH_EXCLUDE, required_argument, NULL, 'e' },
-		{ OOBSCONF_KILL_LATENCY, required_argument, NULL, 'l' },
-		{ OOBSCONF_KILL_SIGNAL, required_argument, NULL, 'k' },
-		{ OOBSCONF_REDIRECT_INPUT, required_argument, NULL, 't' },
-		{ OOBSCONF_REDIRECT_OUTPUT, required_argument, NULL, 'o' },
-		{ OOBSCONF_REDIRECT_SIGNAL, required_argument, NULL, 's' },
+		{ OCKD_WATCH_PATH, required_argument, NULL, 'p' },
+		{ OCKD_WATCH_RECURSIVE, required_argument, NULL, 'r' },
+		{ OCKD_WATCH_UPDATE_NODES, required_argument, NULL, 'u' },
+		{ OCKD_WATCH_INCLUDE, required_argument, NULL, 'i' },
+		{ OCKD_WATCH_EXCLUDE, required_argument, NULL, 'e' },
+		{ OCKD_KILL_LATENCY, required_argument, NULL, 'l' },
+		{ OCKD_KILL_SIGNAL, required_argument, NULL, 'k' },
+		{ OCKD_REDIRECT_INPUT, required_argument, NULL, 't' },
+		{ OCKD_REDIRECT_OUTPUT, required_argument, NULL, 'o' },
+		{ OCKD_REDIRECT_SIGNAL, required_argument, NULL, 's' },
 		{ 0, 0, 0, 0 },
 	};
 
