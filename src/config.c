@@ -15,6 +15,7 @@
 #include "config.h"
 
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -25,6 +26,12 @@
 
 /* Initialize configuration structure with default values. */
 void ouroboros_config_init(struct ouroboros_config *config) {
+
+#if HAVE_SYS_INOTIFY_H
+	config->watch_type = ONT_INOTIFY;
+#else
+	config->watch_type = ONT_POLL;
+#endif
 
 	config->watch_recursive = 0;
 	config->watch_update_nodes = 0;

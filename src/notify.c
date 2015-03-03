@@ -8,10 +8,6 @@
  *
  */
 
-#ifdef HAVE_CONFIG_H
-#include "../config.h"
-#endif
-
 #include "notify.h"
 
 #include <dirent.h>
@@ -49,6 +45,8 @@ struct ouroboros_notify *ouroboros_notify_init(enum ouroboros_notify_type type) 
 
 	switch (type) {
 	case ONT_POLL:
+		notify->s.poll.watched = NULL;
+		notify->s.poll.size = 0;
 		break;
 #if HAVE_SYS_INOTIFY_H
 	case ONT_INOTIFY:
@@ -79,6 +77,9 @@ void ouroboros_notify_free(struct ouroboros_notify *notify) {
 
 	switch (notify->type) {
 	case ONT_POLL:
+		while (notify->s.poll.size--)
+			free(notify->s.poll.watched[notify->s.poll.size].path);
+		free(notify->s.poll.watched);
 		break;
 #if HAVE_SYS_INOTIFY_H
 	case ONT_INOTIFY:
@@ -192,6 +193,67 @@ int ouroboros_notify_watch(struct ouroboros_notify *notify, char **dirs) {
 	return 0;
 }
 
+/* Internal function to check name against the regex patterns. If given
+ * name should trigger notification 1 is returned, otherwise 0. */
+static int _check_patterns(struct ouroboros_notify *notify, const char *name) {
+
+	int i;
+
+	/* check the name against include patterns, if matched, then check against
+	 * exclude patterns - exclude takes precedence over include */
+	for (i = 0; i < notify->include.size; i++)
+		if (regexec(&notify->include.regex[i], name, 0, NULL, 0) == 0) {
+			for (i = 0; i < notify->exclude.size; i++)
+				if (regexec(&notify->exclude.regex[i], name, 0, NULL, 0) == 0)
+					return 0;
+			return 1;
+		}
+
+	return 0;
+}
+
+/* Internal function to add new path to the monitoring pool. If given path
+ * is already in the pool, but with different time-stamp or it is seen for
+ * the first time, this function returns 1, otherwise 0. Note, that the path
+ * has to be accepted by the regex patterns. */
+static int _poll_add_path(struct ouroboros_notify *notify, const char *path) {
+
+	/* validate given path with the regex patterns */
+	if (!_check_patterns(notify, path))
+		return 0;
+
+	struct stat s;
+	int i;
+
+	if (stat(path, &s) == -1) {
+		perror("warning: unable to stat pathname");
+		return 0;
+	}
+
+	for (i = 0; i < notify->s.poll.size; i++)
+		if (strcmp(notify->s.poll.watched[i].path, path) == 0) {
+
+			/* check if file is already stored with exact time-stamp */
+			if (notify->s.poll.watched[i].mtime.tv_sec == s.st_mtim.tv_sec &&
+					notify->s.poll.watched[i].mtime.tv_nsec == s.st_mtim.tv_nsec)
+				return 0;
+
+			notify->s.poll.watched[i].mtime.tv_sec = s.st_mtim.tv_sec;
+			notify->s.poll.watched[i].mtime.tv_nsec = s.st_mtim.tv_nsec;
+			return 1;
+		}
+
+	/* add new entry to our monitoring pool */
+	notify->s.poll.size++;
+	notify->s.poll.watched = realloc(notify->s.poll.watched,
+			sizeof(*notify->s.poll.watched) * notify->s.poll.size);
+	notify->s.poll.watched[notify->s.poll.size - 1].mtime.tv_sec = s.st_mtim.tv_sec;
+	notify->s.poll.watched[notify->s.poll.size - 1].mtime.tv_nsec = s.st_mtim.tv_nsec;
+	notify->s.poll.watched[notify->s.poll.size - 1].path = strdup(path);
+
+	return 1;
+}
+
 /* Add given location with all subdirectories (if configured so) into the
  * monitoring subsystem. Upon error this function returns -1. */
 int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *path) {
@@ -234,6 +296,27 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 
 	switch (notify->type) {
 	case ONT_POLL:
+		{
+			DIR *dir;
+			struct dirent *dp;
+			char *tmp;
+
+			/* add current path to the monitoring pool */
+			_poll_add_path(notify, path);
+
+			/* if current path is a directory, add nodes from it */
+			if ((dir = opendir(path)) != NULL) {
+				while ((dp = readdir(dir)) != NULL) {
+					if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+						continue;
+					tmp = malloc(strlen(path) + strlen(dp->d_name) + 2);
+					sprintf(tmp, "%s/%s", path, dp->d_name);
+					_poll_add_path(notify, tmp);
+					free(tmp);
+				}
+				closedir(dir);
+			}
+		}
 		break;
 #if HAVE_SYS_INOTIFY_H
 	case ONT_INOTIFY:
@@ -270,32 +353,32 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 	return 0;
 }
 
-/* Internal function to check name against the regex patterns. If given
- * name should trigger notification 1 is returned, otherwise 0. */
-static int _check_patterns(struct ouroboros_notify *notify, const char *name) {
-
-	int i;
-
-	/* check the name against include patterns, if matched, then check against
-	 * exclude patterns - exclude takes precedence over include */
-	for (i = 0; i < notify->include.size; i++)
-		if (regexec(&notify->include.regex[i], name, 0, NULL, 0) == 0) {
-			for (i = 0; i < notify->exclude.size; i++)
-				if (regexec(&notify->exclude.regex[i], name, 0, NULL, 0) == 0)
-					return 0;
-			return 1;
-		}
-
-	return 0;
-}
-
 /* Dispatch notification event and optionally add new directories into the
  * monitoring subsystem. If current event matches given patterns, then this
  * function returns 1. Upon error this function returns -1. */
 int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
+	debug("dispatch");
 
 	switch (notify->type) {
 	case ONT_POLL:
+		{
+			struct stat s;
+			int rv = 0;
+			int i;
+
+			for (i = 0; i < notify->s.poll.size; i++) {
+				if (stat(notify->s.poll.watched[i].path, &s) == -1)
+					continue;
+				/* check if file time-stamp has changed */
+				if (notify->s.poll.watched[i].mtime.tv_sec != s.st_mtim.tv_sec &&
+						notify->s.poll.watched[i].mtime.tv_nsec != s.st_mtim.tv_nsec) {
+					notify->s.poll.watched[i].mtime.tv_sec = s.st_mtim.tv_sec;
+					notify->s.poll.watched[i].mtime.tv_nsec = s.st_mtim.tv_nsec;
+					rv = 1;
+				}
+			}
+			return rv;
+		}
 		break;
 #if HAVE_SYS_INOTIFY_H
 	case ONT_INOTIFY:

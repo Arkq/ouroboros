@@ -11,14 +11,22 @@
 #ifndef __NOTIFY_H
 #define __NOTIFY_H
 
+#ifdef HAVE_CONFIG_H
+#include "../config.h"
+#endif
+
 #include <regex.h>
+#include <time.h>
 
 
 /* available notification types (might be OS specific) */
 enum ouroboros_notify_type {
 	ONT_POLL = 0,
+#if HAVE_SYS_INOTIFY_H
 	ONT_INOTIFY,
+#endif
 };
+
 
 /* data structure definition for ERE patterns */
 struct ouroboros_notify_patterns {
@@ -28,7 +36,14 @@ struct ouroboros_notify_patterns {
 
 
 struct ouroboros_notify_data_poll {
+	/* internal filenames tracking */
+	struct {
+		struct timespec mtime;
+		char *path;
+	} *watched;
+	int size;
 };
+
 
 struct ouroboros_notify_data_inotify {
 	/* inotify file descriptor */
@@ -58,7 +73,9 @@ struct ouroboros_notify {
 	/* data storage for configured type */
 	union {
 		struct ouroboros_notify_data_poll poll;
+#if HAVE_SYS_INOTIFY_H
 		struct ouroboros_notify_data_inotify inotify;
+#endif
 	} s;
 
 };

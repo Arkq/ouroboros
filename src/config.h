@@ -11,9 +11,12 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
+#include "notify.h"
+
 
 /* key definitions for configuration file */
 #define OCKD_APP_FILENAME "filename"
+#define OCKD_WATCH_TYPE "watch-type"
 #define OCKD_WATCH_PATH "watch-path"
 #define OCKD_WATCH_RECURSIVE "watch-recursive"
 #define OCKD_WATCH_UPDATE_NODES "watch-update-nodes"
@@ -28,7 +31,10 @@
 
 struct ouroboros_config {
 
-	/* inotify notification */
+	/* notification type */
+	enum ouroboros_notify_type watch_type;
+
+	/* notification */
 	int watch_recursive;
 	int watch_update_nodes;
 	char **watch_paths;
