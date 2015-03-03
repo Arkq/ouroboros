@@ -21,10 +21,9 @@ AM_COND_IF(
 )
 
 
-AC_CHECK_HEADERS(
-	[sys/inotify.h],
-	[], [AC_MSG_ERROR([inotify.h header not found])],
-)
+# notification subsystem support for Linux
+AC_CHECK_HEADERS([sys/inotify.h])
+
 
 # support for the libconfig
 AC_ARG_ENABLE(

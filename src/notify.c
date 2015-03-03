@@ -8,6 +8,10 @@
  *
  */
 
+#ifdef HAVE_CONFIG_H
+#include "../config.h"
+#endif
+
 #include "notify.h"
 
 #include <dirent.h>
@@ -15,8 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/inotify.h>
 #include <sys/stat.h>
+#if HAVE_SYS_INOTIFY_H
+#include <sys/inotify.h>
+#endif
 
 #include "debug.h"
 
@@ -44,6 +50,7 @@ struct ouroboros_notify *ouroboros_notify_init(enum ouroboros_notify_type type) 
 	switch (type) {
 	case ONT_POLL:
 		break;
+#if HAVE_SYS_INOTIFY_H
 	case ONT_INOTIFY:
 		if ((notify->s.inotify.fd = inotify_init1(IN_CLOEXEC)) == -1) {
 			perror("warning: unable to initialize inotify subsystem");
@@ -53,6 +60,7 @@ struct ouroboros_notify *ouroboros_notify_init(enum ouroboros_notify_type type) 
 		notify->s.inotify.paths = NULL;
 		notify->s.inotify.path_max = 0;
 		break;
+#endif /* HAVE_SYS_INOTIFY_H */
 	}
 
 	return notify;
@@ -72,12 +80,14 @@ void ouroboros_notify_free(struct ouroboros_notify *notify) {
 	switch (notify->type) {
 	case ONT_POLL:
 		break;
+#if HAVE_SYS_INOTIFY_H
 	case ONT_INOTIFY:
 		while (notify->s.inotify.path_max--)
 			free(notify->s.inotify.paths[notify->s.inotify.path_max]);
 		free(notify->s.inotify.paths);
 		close(notify->s.inotify.fd);
 		break;
+#endif /* HAVE_SYS_INOTIFY_H */
 	}
 
 	free(notify);
@@ -187,7 +197,6 @@ int ouroboros_notify_watch(struct ouroboros_notify *notify, char **dirs) {
 int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *path) {
 
 	struct stat s;
-	int wd;
 
 	debug("adding new path: %s", path);
 	if (stat(path, &s) == -1) {
@@ -223,24 +232,55 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 		}
 	}
 
-	/* add file/directory to the monitoring subsystem */
-	if ((wd = inotify_add_watch(notify->s.inotify.fd, path, IN_ATTRIB | IN_CREATE |
-				IN_DELETE | IN_CLOSE_WRITE | IN_MOVE_SELF)) != -1) {
+	switch (notify->type) {
+	case ONT_POLL:
+		break;
+#if HAVE_SYS_INOTIFY_H
+	case ONT_INOTIFY:
+		{
+			int wd;
 
-		if (wd >= notify->s.inotify.path_max) {
-			int i;
-			notify->s.inotify.paths = realloc(notify->s.inotify.paths, sizeof(char *) * (wd + 1));
-			for (i = notify->s.inotify.path_max; i <= wd; i++)
-				notify->s.inotify.paths[i] = NULL;
-			notify->s.inotify.path_max = wd + 1;
+			/* add file/directory to the monitoring subsystem */
+			if ((wd = inotify_add_watch(notify->s.inotify.fd, path, IN_ATTRIB |
+							IN_CREATE | IN_DELETE | IN_CLOSE_WRITE | IN_MOVE_SELF)) == -1)
+				perror("warning: unable to add inotify watch");
+			else {
+
+				if (wd >= notify->s.inotify.path_max) {
+					int i;
+					notify->s.inotify.paths = realloc(notify->s.inotify.paths, sizeof(char *) * (wd + 1));
+					for (i = notify->s.inotify.path_max; i <= wd; i++)
+						notify->s.inotify.paths[i] = NULL;
+					notify->s.inotify.path_max = wd + 1;
+				}
+
+				/* store full path of watched location */
+				notify->s.inotify.paths[wd] = strdup(path);
+
+			}
 		}
-
-		/* store full path of watched location */
-		notify->s.inotify.paths[wd] = strdup(path);
-
+		break;
+#endif /* HAVE_SYS_INOTIFY_H */
 	}
-	else
-		perror("warning: unable to add inotify watch");
+
+	return 0;
+}
+
+/* Internal function to check name against the regex patterns. If given
+ * name should trigger notification 1 is returned, otherwise 0. */
+static int _check_patterns(struct ouroboros_notify *notify, const char *name) {
+
+	int i;
+
+	/* check the name against include patterns, if matched, then check against
+	 * exclude patterns - exclude takes precedence over include */
+	for (i = 0; i < notify->include.size; i++)
+		if (regexec(&notify->include.regex[i], name, 0, NULL, 0) == 0) {
+			for (i = 0; i < notify->exclude.size; i++)
+				if (regexec(&notify->exclude.regex[i], name, 0, NULL, 0) == 0)
+					return 0;
+			return 1;
+		}
 
 	return 0;
 }
@@ -250,38 +290,40 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
  * function returns 1. Upon error this function returns -1. */
 int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 
-	char buffer[sizeof(struct inotify_event) + NAME_MAX + 1];
-	struct inotify_event *e = (struct inotify_event *)buffer;
-	ssize_t rlen;
-	int i;
+	switch (notify->type) {
+	case ONT_POLL:
+		break;
+#if HAVE_SYS_INOTIFY_H
+	case ONT_INOTIFY:
+		{
+			char buffer[sizeof(struct inotify_event) + NAME_MAX + 1];
+			struct inotify_event *e = (struct inotify_event *)buffer;
+			ssize_t rlen;
+			int i;
 
-	rlen = read(notify->s.inotify.fd, e, sizeof(buffer));
+			rlen = read(notify->s.inotify.fd, e, sizeof(buffer));
 
-	/* we need to read at least the size of the inotify event structure */
-	if (rlen < (signed)sizeof(struct inotify_event)) {
-		fprintf(stderr, "warning: dispatching inotify event failed\n");
-		return -1;
-	}
+			/* we need to read at least the size of the inotify event structure */
+			if (rlen < (signed)sizeof(struct inotify_event)) {
+				fprintf(stderr, "warning: dispatching inotify event failed\n");
+				return -1;
+			}
 
-	debug("notify event: wd=%d, mask=%x, name=%s", e->wd, e->mask, e->name);
+			debug("notify event: wd=%d, mask=%x, name=%s", e->wd, e->mask, e->name);
 
-	/* update new nodes - directory created or permission changed */
-	if (notify->update_nodes && e->mask & IN_ISDIR && e->mask & (IN_CREATE | IN_ATTRIB)) {
-		char *tmp = malloc(strlen(notify->s.inotify.paths[e->wd]) + strlen(e->name) + 2);
-		sprintf(tmp, "%s/%s", notify->s.inotify.paths[e->wd], e->name);
-		ouroboros_notify_watch_path(notify, tmp);
-		free(tmp);
-	}
+			/* update new nodes - directory created or permission changed */
+			if (notify->update_nodes && e->mask & IN_ISDIR && e->mask & (IN_CREATE | IN_ATTRIB)) {
+				char *tmp = malloc(strlen(notify->s.inotify.paths[e->wd]) + strlen(e->name) + 2);
+				sprintf(tmp, "%s/%s", notify->s.inotify.paths[e->wd], e->name);
+				ouroboros_notify_watch_path(notify, tmp);
+				free(tmp);
+			}
 
-	/* check the name against include patterns, if matched, then check against
-	 * exclude patterns - exclude takes precedence over include */
-	for (i = 0; i < notify->include.size; i++)
-		if (regexec(&notify->include.regex[i], e->name, 0, NULL, 0) == 0) {
-			for (i = 0; i < notify->exclude.size; i++)
-				if (regexec(&notify->exclude.regex[i], e->name, 0, NULL, 0) == 0)
-					return 0;
-			return 1;
+			return _check_patterns(notify, e->name);
 		}
+		break;
+#endif /* HAVE_SYS_INOTIFY_H */
+	}
 
 	return 0;
 }
