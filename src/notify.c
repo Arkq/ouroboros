@@ -43,6 +43,8 @@ struct ouroboros_notify *ouroboros_notify_init(enum ouroboros_notify_type type) 
 	notify->exclude.regex = NULL;
 	notify->exclude.size = 0;
 
+	notify->paths = NULL;
+
 	switch (type) {
 	case ONT_POLL:
 		notify->s.poll.watched = NULL;
@@ -75,6 +77,15 @@ void ouroboros_notify_free(struct ouroboros_notify *notify) {
 		regfree(&notify->include.regex[notify->exclude.size]);
 	free(notify->exclude.regex);
 
+	if (notify->paths) {
+		char **ptr = notify->paths;
+		while (*ptr) {
+			free(*ptr);
+			ptr++;
+		}
+	}
+	free(notify->paths);
+
 	switch (notify->type) {
 	case ONT_POLL:
 		while (notify->s.poll.size--)
@@ -102,13 +113,9 @@ static int _compile_regex(regex_t **array, char **values) {
 	int i, j;
 
 	/* count the number of patterns */
-	if (values) {
-		char **ptr = values;
-		while (*ptr) {
+	if (values)
+		while (values[size])
 			size++;
-			ptr++;
-		}
-	}
 
 	/* allocate memory for all given patters, even though some
 	 * of them might be invalid - we will discard them later */
@@ -174,20 +181,32 @@ int ouroboros_notify_exclude_patterns(struct ouroboros_notify *notify, char **va
  * instead. */
 int ouroboros_notify_watch(struct ouroboros_notify *notify, char **dirs) {
 
+	char cwd[128];
+	char *defaults[] = { cwd, NULL };
+	int size = 0;
+
 	if (dirs == NULL) {
-		char cwd[128];
+		dirs = defaults;
 		if (getcwd(cwd, sizeof(cwd)) == NULL) {
 			fprintf(stderr, "error: unable to get current working directory\n");
 			return -1;
 		}
-		ouroboros_notify_watch_path(notify, cwd);
-		return 0;
 	}
 
+	/* get the number of elements in the array */
+	while (dirs[size])
+		size++;
+
+	if ((notify->paths = malloc(sizeof(char *) * (size + 1))) == NULL)
+		return -1;
+
+	/* list terminator */
+	notify->paths[size] = NULL;
+
 	/* iterate over given directories */
-	while (*dirs) {
-		ouroboros_notify_watch_path(notify, *dirs);
-		dirs++;
+	while (size--) {
+		ouroboros_notify_watch_path(notify, dirs[size]);
+		notify->paths[size] = strdup(dirs[size]);
 	}
 
 	return 0;
@@ -201,9 +220,9 @@ static int _check_patterns(struct ouroboros_notify *notify, const char *name) {
 
 	/* check the name against include patterns, if matched, then check against
 	 * exclude patterns - exclude takes precedence over include */
-	for (i = 0; i < notify->include.size; i++)
+	for (i = notify->include.size; i--; )
 		if (regexec(&notify->include.regex[i], name, 0, NULL, 0) == 0) {
-			for (i = 0; i < notify->exclude.size; i++)
+			for (i = notify->exclude.size; i--; )
 				if (regexec(&notify->exclude.regex[i], name, 0, NULL, 0) == 0)
 					return 0;
 			return 1;
@@ -212,68 +231,46 @@ static int _check_patterns(struct ouroboros_notify *notify, const char *name) {
 	return 0;
 }
 
-/* Internal function to add new path to the monitoring pool. If given path
- * is already in the pool, but with different time-stamp or it is seen for
- * the first time, this function returns 1, otherwise 0. Note, that the path
- * has to be accepted by the regex patterns. */
-static int _poll_add_path(struct ouroboros_notify *notify, const char *path) {
+/* Internal function to add new path to the monitoring pool. On success this
+ * function returns 0, otherwise -1. */
+static int _poll_add_path(struct ouroboros_notify_data_poll *data,
+		const char *path, const struct timespec *mtime) {
 
-	/* validate given path with the regex patterns */
-	if (!_check_patterns(notify, path))
-		return 0;
+	int end = data->size;
 
-	struct stat s;
-	int i;
+	data->size++;
+	data->watched = realloc(data->watched, sizeof(*data->watched) * data->size);
+	data->watched[end].mtime.tv_sec = mtime->tv_sec;
+	data->watched[end].mtime.tv_nsec = mtime->tv_nsec;
+	data->watched[end].path = strdup(path);
 
-	if (stat(path, &s) == -1) {
-		perror("warning: unable to stat pathname");
-		return 0;
-	}
-
-	for (i = 0; i < notify->s.poll.size; i++)
-		if (strcmp(notify->s.poll.watched[i].path, path) == 0) {
-
-			/* check if file is already stored with exact time-stamp */
-			if (notify->s.poll.watched[i].mtime.tv_sec == s.st_mtim.tv_sec &&
-					notify->s.poll.watched[i].mtime.tv_nsec == s.st_mtim.tv_nsec)
-				return 0;
-
-			notify->s.poll.watched[i].mtime.tv_sec = s.st_mtim.tv_sec;
-			notify->s.poll.watched[i].mtime.tv_nsec = s.st_mtim.tv_nsec;
-			return 1;
-		}
-
-	/* add new entry to our monitoring pool */
-	notify->s.poll.size++;
-	notify->s.poll.watched = realloc(notify->s.poll.watched,
-			sizeof(*notify->s.poll.watched) * notify->s.poll.size);
-	notify->s.poll.watched[notify->s.poll.size - 1].mtime.tv_sec = s.st_mtim.tv_sec;
-	notify->s.poll.watched[notify->s.poll.size - 1].mtime.tv_nsec = s.st_mtim.tv_nsec;
-	notify->s.poll.watched[notify->s.poll.size - 1].path = strdup(path);
-
-	return 1;
+	return 0;
 }
 
 /* Add given location with all subdirectories (if configured so) into the
  * monitoring subsystem. Upon error this function returns -1. */
 int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *path) {
+	debug("adding new path: %s", path);
 
 	struct stat s;
 
-	debug("adding new path: %s", path);
 	if (stat(path, &s) == -1) {
 		perror("warning: unable to stat pathname");
 		return -1;
 	}
 
-	/* go into the recursive mode - if enabled */
-	if (notify->recursive && S_ISDIR(s.st_mode)) {
+	/* add current path to the monitoring pool */
+	if (notify->type == ONT_POLL)
+		if (_check_patterns(notify, path))
+			_poll_add_path(&notify->s.poll, path, &s.st_mtim);
+
+	/* iterate over all nodes if path is a directory */
+	if (S_ISDIR(s.st_mode) && (notify->recursive || notify->type == ONT_POLL)) {
 
 		DIR *dir;
 		struct dirent *dp;
 		char *tmp;
 
-		/* iterate over subdirectories */
 		if ((dir = opendir(path)) != NULL) {
 			while ((dp = readdir(dir)) != NULL) {
 
@@ -284,9 +281,18 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 				tmp = malloc(strlen(path) + strlen(dp->d_name) + 2);
 				sprintf(tmp, "%s/%s", path, dp->d_name);
 
-				/* if current name is a directory go recursive */
-				if (stat(tmp, &s) != -1 && S_ISDIR(s.st_mode))
-					ouroboros_notify_watch_path(notify, tmp);
+				if (stat(tmp, &s) != -1) {
+
+					/* add node to the monitoring pool */
+					if (notify->type == ONT_POLL)
+						if (_check_patterns(notify, tmp))
+							_poll_add_path(&notify->s.poll, tmp, &s.st_mtim);
+
+					/* recursive mode and current name is a directory - go deeper */
+					if (notify->recursive && S_ISDIR(s.st_mode))
+						ouroboros_notify_watch_path(notify, tmp);
+
+				}
 
 				free(tmp);
 			}
@@ -296,27 +302,10 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 
 	switch (notify->type) {
 	case ONT_POLL:
-		{
-			DIR *dir;
-			struct dirent *dp;
-			char *tmp;
-
-			/* add current path to the monitoring pool */
-			_poll_add_path(notify, path);
-
-			/* if current path is a directory, add nodes from it */
-			if ((dir = opendir(path)) != NULL) {
-				while ((dp = readdir(dir)) != NULL) {
-					if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
-						continue;
-					tmp = malloc(strlen(path) + strlen(dp->d_name) + 2);
-					sprintf(tmp, "%s/%s", path, dp->d_name);
-					_poll_add_path(notify, tmp);
-					free(tmp);
-				}
-				closedir(dir);
-			}
-		}
+		/* Poll-based notification type is incorporated in the main code base of
+		 * this function. It has some penalty on the readability. Nonetheless it
+		 * is the only reliable method - always available - so it is wise to put
+		 * some micro optimization into this section. */
 		break;
 #if HAVE_SYS_INOTIFY_H
 	case ONT_INOTIFY:
@@ -331,8 +320,8 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 			else {
 
 				/* check for already stored watch descriptor */
-				for (i = notify->s.inotify.size; i; i--)
-					if (notify->s.inotify.watched[i - 1].wd == wd)
+				for (i = notify->s.inotify.size; i--; )
+					if (notify->s.inotify.watched[i].wd == wd)
 						break;
 
 				/* add new watched location (full patch) */
@@ -362,22 +351,67 @@ int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 	switch (notify->type) {
 	case ONT_POLL:
 		{
-			struct stat s;
-			int rv = 0;
-			int i;
+			if (notify->update_nodes) {
 
-			for (i = 0; i < notify->s.poll.size; i++) {
-				if (stat(notify->s.poll.watched[i].path, &s) == -1)
-					continue;
-				/* check if file time-stamp has changed */
-				if (notify->s.poll.watched[i].mtime.tv_sec != s.st_mtim.tv_sec &&
-						notify->s.poll.watched[i].mtime.tv_nsec != s.st_mtim.tv_nsec) {
-					notify->s.poll.watched[i].mtime.tv_sec = s.st_mtim.tv_sec;
-					notify->s.poll.watched[i].mtime.tv_nsec = s.st_mtim.tv_nsec;
-					rv = 1;
+				struct ouroboros_notify_data_poll olddata;
+				char **dirs = notify->paths;
+				int rv = 0;
+
+				/* save current data snapshot and clear original */
+				memcpy(&olddata, &notify->s.poll, sizeof(olddata));
+				notify->s.poll.watched = NULL;
+				notify->s.poll.size = 0;
+
+				/* get fresh data snapshot */
+				while (*dirs) {
+					ouroboros_notify_watch_path(notify, *dirs);
+					dirs++;
 				}
+
+				if (olddata.size != notify->s.poll.size)
+					rv = 1;
+				else
+					/* this logic exploits the fact, that the order of returned nodes
+					 * from the stream is constant - if FS has not been modified */
+					while (olddata.size--) {
+						free(olddata.watched[olddata.size].path);
+						/* check if file time-stamp has changed */
+						if (notify->s.poll.watched[olddata.size].mtime.tv_sec != olddata.watched[olddata.size].mtime.tv_sec ||
+								notify->s.poll.watched[olddata.size].mtime.tv_nsec != olddata.watched[olddata.size].mtime.tv_nsec) {
+							rv = 1;
+							break;
+						}
+					}
+
+				while (olddata.size--)
+					free(olddata.watched[olddata.size].path);
+				free(olddata.watched);
+
+				return rv;
 			}
-			return rv;
+			else {
+
+				struct stat s;
+				int rv = 0;
+				int i;
+
+				for (i = notify->s.poll.size; i--; ) {
+					if (stat(notify->s.poll.watched[i].path, &s) == -1)
+						/* the most probable reason for this fail is that the file has
+						 * been removed, however we are working in the non-update mode,
+						 * so drop this error silently */
+						continue;
+					/* check if file time-stamp has changed */
+					if (notify->s.poll.watched[i].mtime.tv_sec != s.st_mtim.tv_sec ||
+							notify->s.poll.watched[i].mtime.tv_nsec != s.st_mtim.tv_nsec) {
+						notify->s.poll.watched[i].mtime.tv_sec = s.st_mtim.tv_sec;
+						notify->s.poll.watched[i].mtime.tv_nsec = s.st_mtim.tv_nsec;
+						rv = 1;
+					}
+				}
+
+				return rv;
+			}
 		}
 		break;
 #if HAVE_SYS_INOTIFY_H

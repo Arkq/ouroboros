@@ -70,6 +70,9 @@ struct ouroboros_notify {
 	struct ouroboros_notify_patterns include;
 	struct ouroboros_notify_patterns exclude;
 
+	/* watched paths - entry points */
+	char **paths;
+
 	/* data storage for configured type */
 	union {
 		struct ouroboros_notify_data_poll poll;
