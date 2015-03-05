@@ -196,6 +196,10 @@ return_usage:
 	if (!config.watch_recursive)
 		config.watch_update_nodes = 0;
 
+	/* since this tool is intended to be be used for development, it might be
+	 * a nice addition to disable the buffering on the standard output */
+	setvbuf(stdout, NULL, _IONBF, 0);
+
 	ouroboros_notify_recursive(notify, config.watch_recursive);
 	ouroboros_notify_update_nodes(notify, config.watch_update_nodes);
 	ouroboros_notify_include_patterns(notify, config.watch_includes);
