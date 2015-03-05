@@ -56,14 +56,14 @@ static void setup_signals(int *signals) {
 int main(int argc, char **argv) {
 
 	int opt;
-	const char *opts = "hc:W:p:r:u:i:e:l:k:t:o:s:";
+	const char *opts = "hc:E:p:r:u:i:e:l:k:t:o:s:";
 	struct option longopts[] = {
 		{ "help", no_argument, NULL, 'h' },
 #if ENABLE_LIBCONFIG
 		{ "config", required_argument, NULL, 'c' },
 #endif
 		/* runtime configuration */
-		{ OCKD_WATCH_TYPE, required_argument, NULL, 'W' },
+		{ OCKD_WATCH_ENGINE, required_argument, NULL, 'E' },
 		{ OCKD_WATCH_PATH, required_argument, NULL, 'p' },
 		{ OCKD_WATCH_RECURSIVE, required_argument, NULL, 'r' },
 		{ OCKD_WATCH_UPDATE_NODES, required_argument, NULL, 'u' },
@@ -91,7 +91,7 @@ return_usage:
 #if ENABLE_LIBCONFIG
 					"  -c, --config=FILE\t\tuse this configuration file\n"
 #endif
-					"  -W, --watch-type=TYPE\n"
+					"  -E, --watch-engine=TYPE\n"
 					"  -p, --watch-path=DIR\n"
 					"  -r, --watch-recursive=BOOL\n"
 					"  -u, --watch-update-nodes=BOOL\n"
@@ -138,8 +138,11 @@ return_usage:
 	optind = 0;
 	while ((opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1)
 		switch (opt) {
-		case 'W':
-			config.watch_type = atoi(optarg);
+		case 'E':
+			if ((opt = ouroboros_config_get_engine(optarg)) == -1)
+				fprintf(stderr, "warning: unrecognized engine: %s\n", optarg);
+			else
+				config.engine = opt;
 			break;
 		case 'p':
 			ouroboros_config_add_string(&config.watch_paths, optarg);
@@ -189,7 +192,7 @@ return_usage:
 	int rv;
 
 	/* it is our crucial subsystem - running without it is pointless */
-	if ((notify = ouroboros_notify_init(config.watch_type)) == NULL)
+	if ((notify = ouroboros_notify_init(config.engine)) == NULL)
 		return EXIT_FAILURE;
 
 	/* non-recursive mode implicitly excludes updates */
@@ -221,7 +224,7 @@ return_usage:
 	pfds[1].events = POLLIN;
 	pfds[1].fd = -1;
 #if HAVE_SYS_INOTIFY_H
-	if (config.watch_type == ONT_INOTIFY)
+	if (config.engine == ONT_INOTIFY)
 		pfds[1].fd = notify->s.inotify.fd;
 #endif /* HAVE_SYS_INOTIFY_H */
 
@@ -239,7 +242,7 @@ return_usage:
 			/* update pid for signal redirection */
 			sr_pid = process.pid;
 			/* update interval for poll notification type */
-			if (config.watch_type == ONT_POLL)
+			if (config.engine == ONT_POLL)
 				timeout = config.kill_latency * 1000;
 		}
 
@@ -252,7 +255,7 @@ return_usage:
 		}
 
 		/* maintain intervals for poll notification type */
-		if (rv == 0 && config.watch_type == ONT_POLL) {
+		if (rv == 0 && config.engine == ONT_POLL) {
 			restart = ouroboros_notify_dispatch(notify);
 			continue;
 		}

@@ -27,11 +27,8 @@
 /* Initialize configuration structure with default values. */
 void ouroboros_config_init(struct ouroboros_config *config) {
 
-#if HAVE_SYS_INOTIFY_H
-	config->watch_type = ONT_INOTIFY;
-#else
-	config->watch_type = ONT_POLL;
-#endif
+	/* fall-back engine - will always work */
+	config->engine = ONT_POLL;
 
 	config->watch_recursive = 0;
 	config->watch_update_nodes = 0;
@@ -79,6 +76,10 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 	int length;
 	int val;
 	int i;
+
+	if (config_setting_lookup_string(root, OCKD_WATCH_ENGINE, &tmp))
+		if ((val = ouroboros_config_get_engine(tmp)) != -1)
+			config->engine = val;
 
 	config_setting_lookup_bool(root, OCKD_WATCH_RECURSIVE, &config->watch_recursive);
 
@@ -244,6 +245,20 @@ int ouroboros_config_get_bool(const char *name) {
 	if (atoi(name) || strcasecmp(name, "true") == 0)
 		return 1;
 	return 0;
+}
+
+/* Convert engine name into the corresponding enum number. If name can not
+ * be resolved, then -1 is returned. */
+int ouroboros_config_get_engine(const char *name) {
+
+	if (strcmp(name, "poll") == 0)
+		return ONT_POLL;
+#if HAVE_SYS_INOTIFY_H
+	else if (strcmp(name, "inotify") == 0)
+		return ONT_INOTIFY;
+#endif /* HAVE_SYS_INOTIFY_H */
+
+	return -1;
 }
 
 /* Convert signal name into the corresponding number for current platform.

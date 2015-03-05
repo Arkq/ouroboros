@@ -16,7 +16,7 @@
 
 /* key definitions for configuration file */
 #define OCKD_APP_FILENAME "filename"
-#define OCKD_WATCH_TYPE "watch-type"
+#define OCKD_WATCH_ENGINE "watch-engine"
 #define OCKD_WATCH_PATH "watch-path"
 #define OCKD_WATCH_RECURSIVE "watch-recursive"
 #define OCKD_WATCH_UPDATE_NODES "watch-update-nodes"
@@ -31,8 +31,8 @@
 
 struct ouroboros_config {
 
-	/* notification type */
-	enum ouroboros_notify_type watch_type;
+	/* notification type - engine */
+	enum ouroboros_notify_type engine;
 
 	/* notification */
 	int watch_recursive;
@@ -63,6 +63,7 @@ int ouroboros_config_add_int(int **array, int value);
 int ouroboros_config_add_string(char ***array, const char *value);
 
 int ouroboros_config_get_bool(const char *name);
+int ouroboros_config_get_engine(const char *name);
 int ouroboros_config_get_signal(const char *name);
 
 char *get_ouroboros_config_file(void);
