@@ -93,3 +93,10 @@ watched files are modified. So here is what will happen:
 And after the fix:
 
 	Starting server: localhost:8000
+
+
+Similar projects
+----------------
+
+1. [inotifywait](https://github.com/rvoicilas/inotify-tools/wiki) - wait for a particular event on a set of files
+2. [watchman](https://facebook.github.io/watchman/) - a file watching service developed by Facebook
