@@ -205,6 +205,7 @@ return_usage:
 
 	ouroboros_notify_recursive(notify, config.watch_recursive);
 	ouroboros_notify_update_nodes(notify, config.watch_update_nodes);
+	ouroboros_notify_dirs_only(notify, config.watch_dirs_only);
 	ouroboros_notify_include_patterns(notify, config.watch_includes);
 	ouroboros_notify_exclude_patterns(notify, config.watch_excludes);
 	ouroboros_notify_watch(notify, config.watch_paths);

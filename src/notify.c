@@ -154,6 +154,15 @@ int ouroboros_notify_update_nodes(struct ouroboros_notify *notify, int value) {
 	return tmp;
 }
 
+/* Enable or disable watching directories only. This scanning behavior might
+ * boost performance significantly, however may not work on all file systems.
+ * This function returns the previous value. */
+int ouroboros_notify_dirs_only(struct ouroboros_notify *notify, int value) {
+	int tmp = notify->dirs_only;
+	notify->dirs_only = value;
+	return tmp;
+}
+
 /* Set include pattern values. If given array is empty (passed NULL pointer
  * or first element is NULL), then accept-all regex is assumed as a sane
  * default. This function returns the number of processed patterns. */
@@ -282,16 +291,21 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 				sprintf(tmp, "%s/%s", path, dp->d_name);
 
 				if (stat(tmp, &s) != -1) {
+					if (S_ISDIR(s.st_mode)) {
 
-					/* add node to the monitoring pool */
-					if (notify->type == ONT_POLL)
-						if (_check_patterns(notify, tmp))
-							_poll_add_path(&notify->s.poll, tmp, &s.st_mtim);
+						/* recursive mode, so go deeper */
+						if (notify->recursive)
+							ouroboros_notify_watch_path(notify, tmp);
 
-					/* recursive mode and current name is a directory - go deeper */
-					if (notify->recursive && S_ISDIR(s.st_mode))
-						ouroboros_notify_watch_path(notify, tmp);
+					}
+					else {
 
+						/* add node to the monitoring pool */
+						if (notify->type == ONT_POLL && !notify->dirs_only)
+							if (_check_patterns(notify, tmp))
+								_poll_add_path(&notify->s.poll, tmp, &s.st_mtim);
+
+					}
 				}
 
 				free(tmp);
@@ -313,7 +327,7 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 			int wd;
 			int i;
 
-			/* add file/directory to the monitoring subsystem */
+			/* add path to the monitoring subsystem */
 			if ((wd = inotify_add_watch(notify->s.inotify.fd, path, IN_ATTRIB |
 							IN_CREATE | IN_DELETE | IN_CLOSE_WRITE | IN_MOVE_SELF)) == -1)
 				perror("warning: unable to add inotify watch");

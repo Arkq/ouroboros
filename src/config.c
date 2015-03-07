@@ -32,6 +32,7 @@ void ouroboros_config_init(struct ouroboros_config *config) {
 
 	config->watch_recursive = 0;
 	config->watch_update_nodes = 0;
+	config->watch_dirs_only = 0;
 	config->watch_paths = NULL;
 	config->watch_includes = NULL;
 	config->watch_excludes = NULL;
@@ -108,6 +109,8 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 			if ((tmp = config_setting_get_string_elem(array, i)) != NULL)
 				ouroboros_config_add_string(&config->watch_excludes, tmp);
 	}
+
+	config_setting_lookup_bool(root, OCKD_WATCH_DIR_ONLY, &config->watch_dirs_only);
 
 	config_setting_lookup_float(root, OCKD_KILL_LATENCY, &config->kill_latency);
 
@@ -338,11 +341,9 @@ int ouroboros_config_get_signal(const char *name) {
 	};
 
 	int i = 0;
-	do {
+	while (data[i++].name != NULL);
 		if (strcasecmp(data[i].name, name) == 0)
 			return data[i].value;
-	}
-	while (data[++i].name != NULL);
 
 	return 0;
 }

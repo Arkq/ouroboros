@@ -22,6 +22,7 @@
 #define OCKD_WATCH_UPDATE_NODES "watch-update-nodes"
 #define OCKD_WATCH_INCLUDE "watch-include"
 #define OCKD_WATCH_EXCLUDE "watch-exclude"
+#define OCKD_WATCH_DIR_ONLY "watch-dirs-only"
 #define OCKD_KILL_LATENCY "kill-latency"
 #define OCKD_KILL_SIGNAL "kill-signal"
 #define OCKD_REDIRECT_INPUT "redirect-input"
@@ -37,6 +38,7 @@ struct ouroboros_config {
 	/* notification */
 	int watch_recursive;
 	int watch_update_nodes;
+	int watch_dirs_only;
 	char **watch_paths;
 	char **watch_includes;
 	char **watch_excludes;
