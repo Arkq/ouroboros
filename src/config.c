@@ -297,15 +297,33 @@ int ouroboros_config_get_signal(const char *name) {
 		{ "SIGTTIN", SIGTTIN },
 		{ "SIGTTOU", SIGTTOU },
 		/* signals described in SUSv2 and POSIX.1-2001 */
+#ifdef SIGBUS
 		{ "SIGBUS", SIGBUS },
+#endif
+#ifdef SIGPOLL
 		{ "SIGPOLL", SIGPOLL },
+#endif
+#ifdef SIGPROF
 		{ "SIGPROF", SIGPROF },
+#endif
+#ifdef SIGSYS
 		{ "SIGSYS", SIGSYS },
+#endif
+#ifdef SIGTRAP
 		{ "SIGTRAP", SIGTRAP },
+#endif
+#ifdef SIGURG
 		{ "SIGURG", SIGURG },
+#endif
+#ifdef SIGVTALRM
 		{ "SIGVTALRM", SIGVTALRM },
+#endif
+#ifdef SIGXCPU
 		{ "SIGXCPU", SIGXCPU },
+#endif
+#ifdef SIGXFSZ
 		{ "SIGXFSZ", SIGXFSZ },
+#endif
 		/* various other signals */
 #ifdef SIGIOT
 		{ "SIGIOT", SIGIOT },
