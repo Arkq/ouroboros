@@ -40,6 +40,17 @@ AM_COND_IF(
 	)],
 )
 
+# support for server/client interaction
+AC_ARG_ENABLE(
+	[server],
+	[AS_HELP_STRING([--enable-server], [enable server support])],
+)
+AM_CONDITIONAL([ENABLE_SERVER], [test "x$enable_server" = "xyes"])
+AM_COND_IF(
+	[ENABLE_SERVER],
+	[AC_DEFINE([ENABLE_SERVER], [1], [Define to 1 if server is enabled])],
+)
+
 
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT

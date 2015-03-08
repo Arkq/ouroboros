@@ -25,6 +25,9 @@
 #include "debug.h"
 #include "notify.h"
 #include "process.h"
+#if ENABLE_SERVER
+#include "server.h"
+#endif
 
 
 /* Global variable and handler (callback) for signal redirections. */
@@ -186,7 +189,8 @@ return_usage:
 
 	struct ouroboros_process process;
 	struct ouroboros_notify *notify;
-	struct pollfd pfds[2];
+	struct ouroboros_server *server;
+	struct pollfd pfds[3];
 	char buffer[1024];
 	int restart;
 	int timeout;
@@ -211,6 +215,11 @@ return_usage:
 	ouroboros_notify_exclude_patterns(notify, config.watch_excludes);
 	ouroboros_notify_watch(notify, config.watch_paths);
 
+#if ENABLE_SERVER
+	if ((server = ouroboros_server_init(NULL, 3945)) == NULL)
+		return EXIT_FAILURE;
+#endif /* ENABLE_SERVER */
+
 	ouroboros_process_init(&process, argv[optind], &argv[optind]);
 	process.output = config.redirect_output;
 	process.signal = config.kill_signal;
@@ -230,6 +239,13 @@ return_usage:
 		pfds[1].fd = notify->s.inotify.fd;
 #endif /* HAVE_SYS_INOTIFY_H */
 
+	/* setup server subsystem */
+	pfds[2].events = POLLIN;
+	pfds[2].fd = -1;
+#if ENABLE_SERVER
+	pfds[2].fd = server->fd;
+#endif
+
 	/* run main maintenance loop */
 	for (restart = 1;;) {
 
@@ -248,7 +264,7 @@ return_usage:
 				timeout = config.kill_latency * 1000;
 		}
 
-		if ((rv = poll(pfds, 2, timeout)) == -1) {
+		if ((rv = poll(pfds, 3, timeout)) == -1) {
 			if (errno == EINTR)
 				/* signal interruption, not a big deal */
 				continue;
@@ -281,6 +297,14 @@ return_usage:
 				timeout = config.kill_latency * 1000;
 		}
 
+#if ENABLE_SERVER
+		/* dispatch server incoming data */
+		if (pfds[2].revents & POLLIN) {
+			if (ouroboros_server_dispatch(server) == 1)
+				restart = 1;
+		}
+#endif /* ENABLE_SERVER */
+
 	}
 
 	/* use signal from the configuration to kill process */
@@ -293,8 +317,11 @@ return_usage:
 		debug("process exit status: %d", rv);
 	}
 
-	ouroboros_notify_free(notify);
 	ouroboros_process_free(&process);
+#if ENABLE_SERVER
+	ouroboros_server_free(server);
+#endif
+	ouroboros_notify_free(notify);
 	ouroboros_config_free(&config);
 	return rv;
 }

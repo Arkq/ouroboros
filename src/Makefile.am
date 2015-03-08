@@ -14,3 +14,7 @@ ouroboros_CFLAGS = \
 
 ouroboros_LDADD = \
 	@LIBCONFIG_LIBS@
+
+if ENABLE_SERVER
+ouroboros_SOURCES += server.c
+endif

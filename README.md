@@ -24,7 +24,7 @@ Installation
 
 	$ autoreconf --install
 	$ mkdir build && cd build
-	$ ../configure --enable-libconfig
+	$ ../configure --enable-libconfig --enable-server
 	$ make && make install
 
 
