@@ -11,7 +11,7 @@
 #ifndef __SERVER_H
 #define __SERVER_H
 
-#include <netinet/in.h>
+#include <sys/socket.h>
 
 
 struct ouroboros_server {
