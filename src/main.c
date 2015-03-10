@@ -132,10 +132,9 @@ return_usage:
 	/* load configuration from the given file or default one */
 	if (config_file == NULL)
 		config_file = get_ouroboros_config_file();
-	if (load_ouroboros_config(config_file, argv[optind], &config)) {
-		fprintf(stderr, "error: unable to load config file\n");
-		return EXIT_FAILURE;
-	}
+	if (load_ouroboros_config(config_file, argv[optind], &config))
+		fprintf(stderr, "warning: unable to load configuration file\n");
+	free(config_file);
 #endif /* ENABLE_LIBCONFIG */
 
 	/* parse options - second pass */

@@ -74,7 +74,7 @@ void ouroboros_notify_free(struct ouroboros_notify *notify) {
 	free(notify->include.regex);
 
 	while (notify->exclude.size--)
-		regfree(&notify->include.regex[notify->exclude.size]);
+		regfree(&notify->exclude.regex[notify->exclude.size]);
 	free(notify->exclude.regex);
 
 	if (notify->paths) {
@@ -387,7 +387,8 @@ int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 				else
 					/* this logic exploits the fact, that the order of returned nodes
 					 * from the stream is constant - if FS has not been modified */
-					while (olddata.size--) {
+					while (olddata.size) {
+						olddata.size--;
 						free(olddata.watched[olddata.size].path);
 						/* check if file time-stamp has changed */
 						if (notify->s.poll.watched[olddata.size].mtime.tv_sec != olddata.watched[olddata.size].mtime.tv_sec ||

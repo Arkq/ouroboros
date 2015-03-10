@@ -129,9 +129,12 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 	config_setting_lookup_bool(root, OCKD_REDIRECT_INPUT, &config->redirect_input);
 
 	/* output setting is a special one, because it can be boolean or string*/
-	if (config_setting_lookup_bool(root, OCKD_REDIRECT_OUTPUT, &val))
+	if (config_setting_lookup_bool(root, OCKD_REDIRECT_OUTPUT, &val)) {
+		free(config->redirect_output);
 		config->redirect_output = NULL;
+	}
 	else if (config_setting_lookup_string(root, OCKD_REDIRECT_OUTPUT, &tmp)) {
+		free(config->redirect_output);
 		config->redirect_output = NULL;
 		if (strlen(tmp) != 0)
 			config->redirect_output = strdup(tmp);
@@ -149,6 +152,7 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 
 #if ENABLE_SERVER
 	if (config_setting_lookup_string(root, OCKD_SERVER_INTERFACE, &tmp)) {
+		free(config->server_iface);
 		config->server_iface = NULL;
 		if (strcmp(tmp, "none") != 0)
 			config->server_iface = strdup(tmp);
