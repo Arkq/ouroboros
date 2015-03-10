@@ -28,6 +28,8 @@
 #define OCKD_REDIRECT_INPUT "redirect-input"
 #define OCKD_REDIRECT_OUTPUT "redirect-output"
 #define OCKD_REDIRECT_SIGNAL "redirect-signal"
+#define OCKD_SERVER_INTERFACE "server-interface"
+#define OCKD_SERVER_PORT "server-port"
 
 
 struct ouroboros_config {
@@ -51,6 +53,10 @@ struct ouroboros_config {
 	int redirect_input;
 	char *redirect_output;
 	int *redirect_signals;
+
+	/* server binding */
+	char *server_iface;
+	int server_port;
 
 };
 

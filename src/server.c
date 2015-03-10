@@ -30,29 +30,44 @@
 struct ouroboros_server *ouroboros_server_init(const char *ifname, int port) {
 
 	struct ouroboros_server *server;
-	struct ifaddrs *ifaddr, *ifa;
 
 	if ((server = malloc(sizeof(struct ouroboros_server))) == NULL)
 		return NULL;
-
-	if (ifname != NULL && getifaddrs(&ifaddr) == -1) {
-		perror("warning: unable to list interfaces");
-		ifname = NULL;
-	}
 
 	server->ifname = ifname != NULL ? strdup(ifname) : NULL;
 	server->ifaddr.sa_family = AF_INET;
 	((struct sockaddr_in *)(&server->ifaddr))->sin_addr.s_addr = 0;
 	server->fd = -1;
 
+	if (ifname == NULL)
+		/* server is disabled */
+		return server;
+
 	/* get the address of given interface name */
-	if (ifname != NULL) {
-		for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
-			if (ifa->ifa_addr != NULL && strcmp(ifa->ifa_name, ifname) == 0) {
-				memcpy(&server->ifaddr, ifa->ifa_addr, sizeof(server->ifaddr));
-				break;
+	if (strcmp(ifname, "any") != 0) {
+		struct ifaddrs *ifaddr, *ifa;
+
+		if (getifaddrs(&ifaddr) == -1)
+			perror("warning: unable to list interfaces");
+		else {
+			for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+				if (ifa->ifa_addr == NULL || (
+							ifa->ifa_addr->sa_family != AF_INET &&
+							ifa->ifa_addr->sa_family != AF_INET6))
+					continue;
+				if (strcmp(ifa->ifa_name, ifname) == 0) {
+					memcpy(&server->ifaddr, ifa->ifa_addr, sizeof(server->ifaddr));
+					break;
+				}
 			}
-		freeifaddrs(ifaddr);
+
+			freeifaddrs(ifaddr);
+
+			if (ifa == NULL) {
+				fprintf(stderr, "warning: interface %s not found\n", ifname);
+				return server;
+			}
+		}
 	}
 
 	switch (server->ifaddr.sa_family) {

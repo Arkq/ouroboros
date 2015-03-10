@@ -44,6 +44,11 @@ void ouroboros_config_init(struct ouroboros_config *config) {
 	config->redirect_output = NULL;
 	config->redirect_signals = NULL;
 
+#if ENABLE_SERVER
+	config->server_iface = NULL;
+	config->server_port = 3945;
+#endif /* ENABLE_SERVER */
+
 }
 
 /* Internal function which actually frees array resources. */
@@ -66,6 +71,9 @@ void ouroboros_config_free(struct ouroboros_config *config) {
 	_free_array(&config->watch_excludes);
 	free(config->redirect_output);
 	free(config->redirect_signals);
+#if ENABLE_SERVER
+	free(config->server_iface);
+#endif
 }
 
 #if ENABLE_LIBCONFIG
@@ -138,6 +146,16 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 				if ((val = ouroboros_config_get_signal(tmp)) != 0)
 					ouroboros_config_add_int(&config->redirect_signals, val);
 	}
+
+#if ENABLE_SERVER
+	if (config_setting_lookup_string(root, OCKD_SERVER_INTERFACE, &tmp)) {
+		config->server_iface = NULL;
+		if (strcmp(tmp, "none") != 0)
+			config->server_iface = strdup(tmp);
+	}
+
+	config_setting_lookup_int(root, OCKD_SERVER_PORT, &config->server_port);
+#endif /* ENABLE_SERVER */
 
 }
 #endif /* ENABLE_LIBCONFIG */
@@ -359,9 +377,11 @@ int ouroboros_config_get_signal(const char *name) {
 	};
 
 	int i = 0;
-	while (data[i++].name != NULL);
+	do {
 		if (strcasecmp(data[i].name, name) == 0)
 			return data[i].value;
+	}
+	while (data[++i].name != NULL);
 
 	return 0;
 }

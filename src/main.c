@@ -216,7 +216,8 @@ return_usage:
 	ouroboros_notify_watch(notify, config.watch_paths);
 
 #if ENABLE_SERVER
-	if ((server = ouroboros_server_init(NULL, 3945)) == NULL)
+	server = ouroboros_server_init(config.server_iface, config.server_port);
+	if (server == NULL)
 		return EXIT_FAILURE;
 #endif /* ENABLE_SERVER */
 
