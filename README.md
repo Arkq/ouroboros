@@ -33,7 +33,8 @@ Usage
 
 There are a few configuration options which might need to be tailored for ones requirements,
 however default options should be good enough to start with. For all available options see the
-exemplary configuration file. All of those options might be specified during the runtime as well.
+exemplary configuration file. Most of those options - the important ones - might be specified
+during the runtime as well.
 
 Ouroboros acts like a wrapper, so the basic invocation looks like this:
 

@@ -66,6 +66,7 @@ struct ouroboros_notify {
 	int recursive;
 	int update_nodes;
 	int dirs_only;
+	int files_only;
 
 	/* compiled ERE patterns */
 	struct ouroboros_notify_patterns include;
@@ -91,6 +92,7 @@ void ouroboros_notify_free(struct ouroboros_notify *notify);
 int ouroboros_notify_recursive(struct ouroboros_notify *notify, int value);
 int ouroboros_notify_update_nodes(struct ouroboros_notify *notify, int value);
 int ouroboros_notify_dirs_only(struct ouroboros_notify *notify, int value);
+int ouroboros_notify_files_only(struct ouroboros_notify *notify, int value);
 int ouroboros_notify_include_patterns(struct ouroboros_notify *notify, char **values);
 int ouroboros_notify_exclude_patterns(struct ouroboros_notify *notify, char **values);
 

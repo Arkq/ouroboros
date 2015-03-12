@@ -37,6 +37,8 @@ struct ouroboros_notify *ouroboros_notify_init(enum ouroboros_notify_type type) 
 	/* set defaults for directory watching */
 	notify->recursive = 1;
 	notify->update_nodes = 1;
+	notify->dirs_only = 0;
+	notify->files_only = 0;
 
 	notify->include.regex = NULL;
 	notify->include.size = 0;
@@ -163,6 +165,15 @@ int ouroboros_notify_dirs_only(struct ouroboros_notify *notify, int value) {
 	return tmp;
 }
 
+/* Enable or disable watching files only. This scanning behavior might boost
+ * performance and omit false positive reloads. This function returns the
+ * previous value. */
+int ouroboros_notify_files_only(struct ouroboros_notify *notify, int value) {
+	int tmp = notify->files_only;
+	notify->files_only = value;
+	return tmp;
+}
+
 /* Set include pattern values. If given array is empty (passed NULL pointer
  * or first element is NULL), then accept-all regex is assumed as a sane
  * default. This function returns the number of processed patterns. */
@@ -270,8 +281,9 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 
 	/* add current path to the monitoring pool */
 	if (notify->type == ONT_POLL)
-		if (_check_patterns(notify, path))
-			_poll_add_path(&notify->s.poll, path, &s.st_mtim);
+		if (!(notify->files_only && S_ISDIR(s.st_mode)))
+			if (_check_patterns(notify, path))
+				_poll_add_path(&notify->s.poll, path, &s.st_mtim);
 
 	/* iterate over all nodes if path is a directory */
 	if (S_ISDIR(s.st_mode) && (notify->recursive || notify->type == ONT_POLL)) {

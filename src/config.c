@@ -33,6 +33,7 @@ void ouroboros_config_init(struct ouroboros_config *config) {
 	config->watch_recursive = 0;
 	config->watch_update_nodes = 0;
 	config->watch_dirs_only = 0;
+	config->watch_files_only = 0;
 	config->watch_paths = NULL;
 	config->watch_includes = NULL;
 	config->watch_excludes = NULL;
@@ -119,6 +120,8 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 	}
 
 	config_setting_lookup_bool(root, OCKD_WATCH_DIR_ONLY, &config->watch_dirs_only);
+
+	config_setting_lookup_bool(root, OCKD_WATCH_FILE_ONLY, &config->watch_files_only);
 
 	config_setting_lookup_float(root, OCKD_KILL_LATENCY, &config->kill_latency);
 
