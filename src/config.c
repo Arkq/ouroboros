@@ -397,20 +397,22 @@ int ouroboros_config_get_signal(const char *name) {
  * location. On success it returns file name, otherwise NULL. */
 char *get_ouroboros_config_file(void) {
 
-	const char config[] = "ouroboros/ouroboros.conf";
+	const char config[] = "/ouroboros/ouroboros.conf";
 	char *fullpath;
 	char *tmp;
 
 	/* get our file path in the XDG configuration directory */
 	if ((tmp = getenv("XDG_CONFIG_HOME")) != NULL) {
-		fullpath = malloc(strlen(tmp) + 1 + sizeof(config));
-		sprintf(fullpath, "%s/%s", tmp, config);
+		fullpath = malloc(strlen(tmp) + sizeof(config));
+		sprintf(fullpath, "%s%s", tmp, config);
 	}
-	else {
-		tmp = getenv("HOME");
-		fullpath = malloc(strlen(tmp) + 9 + sizeof(config));
-		sprintf(fullpath, "%s/.config/%s", tmp, config);
+	else if ((tmp = getenv("HOME")) != NULL) {
+		fullpath = malloc(strlen(tmp) + 8 + sizeof(config));
+		sprintf(fullpath, "%s/.config%s", tmp, config);
 	}
+	else
+		/* semi failproof fallback */
+		fullpath = strdup(config);
 
 	/* check if file exists */
 	if (access(fullpath, F_OK) == -1) {
