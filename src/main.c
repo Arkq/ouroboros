@@ -60,7 +60,7 @@ static void setup_signals(int *signals) {
 int main(int argc, char **argv) {
 
 	int opt;
-	const char *opts = "hc:E:p:r:u:i:e:l:k:t:o:s:";
+	const char *opts = "hc:E:p:r:u:i:e:k:l:a:t:o:s:";
 	struct option longopts[] = {
 		{ "help", no_argument, NULL, 'h' },
 #if ENABLE_LIBCONFIG
@@ -73,8 +73,9 @@ int main(int argc, char **argv) {
 		{ OCKD_WATCH_UPDATE_NODES, required_argument, NULL, 'u' },
 		{ OCKD_WATCH_INCLUDE, required_argument, NULL, 'i' },
 		{ OCKD_WATCH_EXCLUDE, required_argument, NULL, 'e' },
-		{ OCKD_KILL_LATENCY, required_argument, NULL, 'l' },
 		{ OCKD_KILL_SIGNAL, required_argument, NULL, 'k' },
+		{ OCKD_KILL_LATENCY, required_argument, NULL, 'l' },
+		{ OCKD_START_LATENCY, required_argument, NULL, 'a' },
 		{ OCKD_REDIRECT_INPUT, required_argument, NULL, 't' },
 		{ OCKD_REDIRECT_OUTPUT, required_argument, NULL, 'o' },
 		{ OCKD_REDIRECT_SIGNAL, required_argument, NULL, 's' },
@@ -101,8 +102,9 @@ return_usage:
 					"  -u, --watch-update-nodes=BOOL\n"
 					"  -i, --watch-include=REGEXP\n"
 					"  -e, --watch-exclude=REGEXP\n"
-					"  -l, --kill-latency=VALUE\n"
 					"  -k, --kill-signal=SIG\n"
+					"  -l, --kill-latency=VALUE\n"
+					"  -a, --start-latency=VALUE\n"
 					"  -t, --redirect-input=BOOL\n"
 					"  -o, --redirect-output=FILE\n"
 					"  -s, --redirect-signal=SIG\n",
@@ -162,14 +164,17 @@ return_usage:
 		case 'e':
 			ouroboros_config_add_string(&config.watch_excludes, optarg);
 			break;
-		case 'l':
-			config.kill_latency = strtod(optarg, NULL);
-			break;
 		case 'k':
 			if ((opt = ouroboros_config_get_signal(optarg)) == 0)
 				fprintf(stderr, "warning: unrecognized signal: %s\n", optarg);
 			else
 				config.kill_signal = opt;
+			break;
+		case 'l':
+			config.kill_latency = strtod(optarg, NULL);
+			break;
+		case 'a':
+			config.start_latency = strtod(optarg, NULL);
 			break;
 		case 't':
 			config.redirect_input = ouroboros_config_get_bool(optarg);
@@ -186,12 +191,18 @@ return_usage:
 			break;
 		}
 
+	enum action {
+		ACTION_NONE = 0,
+		ACTION_KILL,
+		ACTION_START,
+	};
+
 	struct ouroboros_process process;
 	struct ouroboros_notify *notify;
 	struct ouroboros_server *server;
 	struct pollfd pfds[3];
 	char buffer[1024];
-	int restart;
+	enum action action;
 	int timeout;
 	int rv;
 
@@ -248,23 +259,39 @@ return_usage:
 #endif
 
 	/* run main maintenance loop */
-	for (restart = 1;;) {
+	for (action = ACTION_START;;) {
 
-		if (restart) {
-			restart = 0;
-			timeout = -1;
-			kill_ouroboros_process(&process);
-			if (start_ouroboros_process(&process)) {
-				fprintf(stderr, "error: process starting failed\n");
-				return EXIT_FAILURE;
+		if (timeout == -1)
+			switch (action) {
+
+			case ACTION_KILL:
+				action = ACTION_START;
+				timeout = config.start_latency * 1000;
+
+				kill_ouroboros_process(&process);
+
+				break;
+
+			case ACTION_START:
+				action = ACTION_NONE;
+				timeout = -1;
+
+				if (start_ouroboros_process(&process)) {
+					fprintf(stderr, "error: process starting failed\n");
+					return EXIT_FAILURE;
+				}
+
+				/* update pid for signal redirection */
+				sr_pid = process.pid;
+
 			}
-			/* update pid for signal redirection */
-			sr_pid = process.pid;
-			/* update interval for poll notification type */
-			if (config.engine == ONT_POLL)
-				timeout = config.kill_latency * 1000;
-		}
 
+		/* update interval for poll notification type */
+		if (config.engine == ONT_POLL && timeout == -1)
+			/* TODO: dedicated value for polling interval */
+			timeout = config.kill_latency * 1000;
+
+		debug("poll timeout: %d", timeout);
 		if ((rv = poll(pfds, 3, timeout)) == -1) {
 			if (errno == EINTR)
 				/* signal interruption, not a big deal */
@@ -273,15 +300,16 @@ return_usage:
 			break;
 		}
 
-		/* maintain intervals for poll notification type */
-		if (rv == 0 && config.engine == ONT_POLL) {
-			restart = ouroboros_notify_dispatch(notify);
-			continue;
-		}
-
-		/* maintain kill latency */
+		/* timeout handling */
 		if (rv == 0) {
-			restart = 1;
+			timeout = -1;
+			/* maintain intervals for poll notification type */
+			if (config.engine == ONT_POLL && action != ACTION_START) {
+				if (ouroboros_notify_dispatch(notify)) {
+					action = ACTION_KILL;
+					timeout = config.kill_latency * 1000;
+				}
+			}
 			continue;
 		}
 
@@ -294,15 +322,19 @@ return_usage:
 
 		/* dispatch notification event */
 		if (pfds[1].revents & POLLIN) {
-			if (ouroboros_notify_dispatch(notify) == 1)
+			if (ouroboros_notify_dispatch(notify) == 1) {
+				action = ACTION_KILL;
 				timeout = config.kill_latency * 1000;
+			}
 		}
 
 #if ENABLE_SERVER
 		/* dispatch server incoming data */
 		if (pfds[2].revents & POLLIN) {
-			if (ouroboros_server_dispatch(server) == 1)
-				restart = 1;
+			if (ouroboros_server_dispatch(server) == 1) {
+				action = ACTION_KILL;
+				timeout = -1;
+			}
 		}
 #endif /* ENABLE_SERVER */
 

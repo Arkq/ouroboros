@@ -24,8 +24,9 @@
 #define OCKD_WATCH_EXCLUDE "watch-exclude"
 #define OCKD_WATCH_DIR_ONLY "watch-dirs-only"
 #define OCKD_WATCH_FILE_ONLY "watch-files-only"
-#define OCKD_KILL_LATENCY "kill-latency"
 #define OCKD_KILL_SIGNAL "kill-signal"
+#define OCKD_KILL_LATENCY "kill-latency"
+#define OCKD_START_LATENCY "start-latency"
 #define OCKD_REDIRECT_INPUT "redirect-input"
 #define OCKD_REDIRECT_OUTPUT "redirect-output"
 #define OCKD_REDIRECT_SIGNAL "redirect-signal"
@@ -48,8 +49,9 @@ struct ouroboros_config {
 	char **watch_excludes;
 
 	/* kill and reload */
-	double kill_latency;
 	int kill_signal;
+	double kill_latency;
+	double start_latency;
 
 	/* IO redirection */
 	int redirect_input;

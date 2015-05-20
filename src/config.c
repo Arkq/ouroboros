@@ -38,8 +38,9 @@ void ouroboros_config_init(struct ouroboros_config *config) {
 	config->watch_includes = NULL;
 	config->watch_excludes = NULL;
 
-	config->kill_latency = 1;
 	config->kill_signal = SIGTERM;
+	config->kill_latency = 1.0;
+	config->start_latency = 0.0;
 
 	config->redirect_input = 0;
 	config->redirect_output = NULL;
@@ -123,11 +124,13 @@ static void _load_config(const config_setting_t *root, struct ouroboros_config *
 
 	config_setting_lookup_bool(root, OCKD_WATCH_FILE_ONLY, &config->watch_files_only);
 
-	config_setting_lookup_float(root, OCKD_KILL_LATENCY, &config->kill_latency);
-
 	if (config_setting_lookup_string(root, OCKD_KILL_SIGNAL, &tmp))
 		if ((val = ouroboros_config_get_signal(tmp)) != 0)
 			config->kill_signal = val;
+
+	config_setting_lookup_float(root, OCKD_KILL_LATENCY, &config->kill_latency);
+
+	config_setting_lookup_float(root, OCKD_START_LATENCY, &config->start_latency);
 
 	config_setting_lookup_bool(root, OCKD_REDIRECT_INPUT, &config->redirect_input);
 
