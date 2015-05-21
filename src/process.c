@@ -13,6 +13,8 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <proc/readproc.h>
 #include <sys/wait.h>
 
 #include "debug.h"
@@ -40,12 +42,39 @@ void ouroboros_process_free(struct ouroboros_process *process) {
 
 /* Kill running instance of watched process. */
 void kill_ouroboros_process(struct ouroboros_process *process) {
-	debug("killing: pid=%d, signal=%d", process->pid, process->signal);
-	if (process->pid > 0) {
-		if (kill(process->pid, process->signal) == -1)
+
+	if (process->pid <= 0)
+		return;
+
+	PROCTAB *proc;
+	proc_t proc_info;
+
+	pid_t ouroboros_pid = getpid();
+	pid_t process_gpid = getpgid(process->pid);
+
+	proc = openproc(PROC_FILLSTAT);
+	memset(&proc_info, 0, sizeof(proc_info));
+
+	while (readproc(proc, &proc_info) != NULL) {
+
+		/* we are only interested in processes inside the process
+		 * group of our supervised process */
+		if (proc_info.pgrp != process_gpid)
+			continue;
+
+		/* do not become suicidal, it is not cool */
+		if (proc_info.tgid == ouroboros_pid)
+			continue;
+
+		debug("killing: pid=%d, signal=%d", proc_info.tgid, process->signal);
+		if (kill(proc_info.tgid, process->signal) == -1)
 			perror("warning: unable to kill process");
-		waitpid(process->pid, &process->status, 0);
+
+		/* prevent zombie apocalypse */
+		waitpid(proc_info.tgid, &process->status, 0);
 	}
+
+	closeproc(proc);
 }
 
 int start_ouroboros_process(struct ouroboros_process *process) {

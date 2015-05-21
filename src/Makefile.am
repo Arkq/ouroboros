@@ -10,10 +10,12 @@ ouroboros_SOURCES = \
 	main.c
 
 ouroboros_CFLAGS = \
-	@LIBCONFIG_CFLAGS@
+	@LIBCONFIG_CFLAGS@ \
+	@LIBPROCPS_CFLAGS@
 
 ouroboros_LDADD = \
-	@LIBCONFIG_LIBS@
+	@LIBCONFIG_LIBS@ \
+	@LIBPROCPS_LIBS@
 
 if ENABLE_SERVER
 ouroboros_SOURCES += server.c

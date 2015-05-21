@@ -24,6 +24,12 @@ AM_COND_IF(
 # notification subsystem support for Linux
 AC_CHECK_HEADERS([sys/inotify.h])
 
+# processes management
+PKG_CHECK_MODULES(
+	[LIBPROCPS], [libprocps],
+	[], [AC_MSG_ERROR([module libproc not found])],
+)
+
 
 # support for the libconfig
 AC_ARG_ENABLE(
