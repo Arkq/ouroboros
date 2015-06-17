@@ -14,6 +14,7 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <libgen.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -84,6 +85,7 @@ int main(int argc, char **argv) {
 
 	struct ouroboros_config config = { 0 };
 #if ENABLE_LIBCONFIG
+	char *config_appname = NULL;
 	char *config_file = NULL;
 #endif
 
@@ -134,8 +136,10 @@ return_usage:
 	/* load configuration from the given file or default one */
 	if (config_file == NULL)
 		config_file = get_ouroboros_config_file();
-	if (load_ouroboros_config(config_file, argv[optind], &config))
+	config_appname = strdup(argv[optind]);
+	if (load_ouroboros_config(config_file, basename(argv[optind]), &config))
 		fprintf(stderr, "warning: unable to load configuration file\n");
+	free(config_appname);
 	free(config_file);
 #endif /* ENABLE_LIBCONFIG */
 
