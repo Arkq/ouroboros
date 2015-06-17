@@ -61,12 +61,13 @@ static void setup_signals(int *signals) {
 int main(int argc, char **argv) {
 
 	int opt;
-	const char *opts = "hc:E:p:r:u:i:e:k:l:a:t:o:s:";
+	const char *opts = "hc:vE:p:r:u:i:e:k:l:a:t:o:s:";
 	struct option longopts[] = {
 		{ "help", no_argument, NULL, 'h' },
 #if ENABLE_LIBCONFIG
 		{ "config", required_argument, NULL, 'c' },
 #endif
+		{ "verbose", no_argument, NULL, 'v' },
 		/* runtime configuration */
 		{ OCKD_WATCH_ENGINE, required_argument, NULL, 'E' },
 		{ OCKD_WATCH_PATH, required_argument, NULL, 'p' },
@@ -88,6 +89,7 @@ int main(int argc, char **argv) {
 	char *config_appname = NULL;
 	char *config_file = NULL;
 #endif
+	int verbose = 0;
 
 	/* parse options - first pass */
 	while ((opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1)
@@ -95,9 +97,11 @@ int main(int argc, char **argv) {
 		case 'h':
 return_usage:
 			printf("usage: %s [options] [--] <command ...>\n"
+					"options:\n"
 #if ENABLE_LIBCONFIG
 					"  -c, --config=FILE\t\tuse this configuration file\n"
 #endif
+					"  -v, --verbose\t\t\tbe more verbose during the operation\n"
 					"  -E, --watch-engine=TYPE\n"
 					"  -p, --watch-path=DIR\n"
 					"  -r, --watch-recursive=BOOL\n"
@@ -119,6 +123,10 @@ return_usage:
 			break;
 #endif /* ENABLE_LIBCONFIG */
 
+		case 'v':
+			verbose++;
+			break;
+
 		case '?':
 		case ':':
 			fprintf(stderr, "Try '%s --help' for more information.\n", argv[0]);
@@ -137,6 +145,8 @@ return_usage:
 	if (config_file == NULL)
 		config_file = get_ouroboros_config_file();
 	config_appname = strdup(argv[optind]);
+	if (verbose)
+		fprintf(stderr, "Loading configuration: %s\n", config_file);
 	if (load_ouroboros_config(config_file, basename(argv[optind]), &config))
 		fprintf(stderr, "warning: unable to load configuration file\n");
 	free(config_appname);
@@ -194,6 +204,9 @@ return_usage:
 				ouroboros_config_add_int(&config.redirect_signals, opt);
 			break;
 		}
+
+	if (verbose >= 2)
+		dump_ouroboros_config(&config);
 
 	enum action {
 		ACTION_NONE = 0,
@@ -280,6 +293,15 @@ return_usage:
 				action = ACTION_NONE;
 				timeout = -1;
 
+				/* show what we are going to start */
+				if (verbose) {
+					char **tmp = &argv[optind];
+					fprintf(stderr, "Running command:");
+					for (; *tmp != NULL; tmp++)
+						fprintf(stderr, " %s", *tmp);
+					fprintf(stderr, "\n");
+				}
+
 				if (start_ouroboros_process(&process)) {
 					fprintf(stderr, "error: process starting failed\n");
 					return EXIT_FAILURE;
@@ -287,6 +309,9 @@ return_usage:
 
 				/* update pid for signal redirection */
 				sr_pid = process.pid;
+
+				if (verbose)
+					fprintf(stderr, "Process ID: %d\n", process.pid);
 
 			}
 

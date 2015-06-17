@@ -71,6 +71,8 @@ void ouroboros_config_free(struct ouroboros_config *config);
 int load_ouroboros_config(const char *filename, const char *appname,
 		struct ouroboros_config *config);
 
+void dump_ouroboros_config(const struct ouroboros_config *config);
+
 int ouroboros_config_add_int(int **array, int value);
 int ouroboros_config_add_string(char ***array, const char *value);
 

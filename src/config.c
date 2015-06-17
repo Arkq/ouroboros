@@ -218,6 +218,90 @@ int load_ouroboros_config(const char *filename, const char *appname,
 }
 #endif /* ENABLE_LIBCONFIG */
 
+/* Dump configuration settings on the standard error output. */
+void dump_ouroboros_config(const struct ouroboros_config *config) {
+
+	const char *_engine(enum ouroboros_notify_type value) {
+		switch (value) {
+		case ONT_POLL:
+			return "pool";
+#if HAVE_SYS_INOTIFY_H
+		case ONT_INOTIFY:
+			return "inotify";
+#endif /* HAVE_SYS_INOTIFY_H */
+		}
+	}
+
+	const char *_boolean(int value) {
+		return value ? "true" : "false";
+	}
+
+	void _dump_array_char(const char *info, char **array) {
+		fprintf(stderr, "%s", info);
+		if (array) {
+			char **tmp = array;
+			for (; *array != NULL; array++)
+				fprintf(stderr, "%s%s", array == tmp ? "" : ", ", *array);
+		}
+		fprintf(stderr, "\n");
+	}
+
+	void _dump_array_int(const char *info, int *array) {
+		fprintf(stderr, "%s", info);
+		if (array) {
+			int *tmp = array;
+			for (; *array; array++)
+				fprintf(stderr, "%s%d", array == tmp ? "" : ", ", *array);
+		}
+		fprintf(stderr, "\n");
+	}
+
+	fprintf(stderr, "Configuration:\n"
+			"  notification engine:\t%s\n"
+			"  watch recursive:\t%s\n"
+			"  watch update nodes:\t%s\n"
+			"  watch dirs only:\t%s\n"
+			"  watch files only:\t%s\n"
+			"",
+			_engine(config->engine),
+			_boolean(config->watch_recursive),
+			_boolean(config->watch_update_nodes),
+			_boolean(config->watch_dirs_only),
+			_boolean(config->watch_files_only),
+			NULL);
+
+	_dump_array_char("  watch paths:\t\t", config->watch_paths);
+	_dump_array_char("  watch includes:\t", config->watch_includes);
+	_dump_array_char("  watch excludes:\t", config->watch_excludes);
+
+	fprintf(stderr,
+			"  kill signal:\t\t%u\n"
+			"  kill latency:\t\t%.2f s\n"
+			"  start latency:\t%.2f s\n"
+			"  redirect input:\t%s\n"
+			"  redirect output:\t%s\n"
+			"",
+			config->kill_signal,
+			config->kill_latency,
+			config->start_latency,
+			_boolean(config->redirect_input),
+			config->redirect_output,
+			NULL);
+
+	_dump_array_int("  redirect signals:\t", config->redirect_signals);
+
+#if ENABLE_SERVER
+	fprintf(stderr,
+			"  server iface:\t\t%s\n"
+			"  server port:\t\t%u\n"
+			"",
+			config->server_iface,
+			config->server_port,
+			NULL);
+#endif /* ENABLE_SERVER */
+
+}
+
 /* Add new non-zero value to the array. On success this function returns
  * the number of stored elements in the array, otherwise -1. */
 int ouroboros_config_add_int(int **array, int value) {
