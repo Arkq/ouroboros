@@ -276,7 +276,9 @@ return_usage:
 #endif
 
 	/* run main maintenance loop */
-	for (action = ACTION_START;;) {
+	action = ACTION_START;
+	timeout = -1;
+	for (;;) {
 
 		if (timeout == -1)
 			switch (action) {
