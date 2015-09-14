@@ -22,6 +22,9 @@
 #if ENABLE_LIBCONFIG
 #include <libconfig.h>
 #endif
+#if ENABLE_INIPARSER
+#include <iniparser.h>
+#endif
 
 
 /* Initialize configuration structure with default values. */
@@ -217,6 +220,69 @@ int load_ouroboros_config(const char *filename, const char *appname,
 	return 0;
 }
 #endif /* ENABLE_LIBCONFIG */
+
+#if ENABLE_INIPARSER
+/* Load configuration from the given file in the INI-like format. Note, that
+ * configuration is loaded from the ouroboros section of the INI file. Also be
+ * aware that not all options are supported via this function (in comparison
+ * with the load_ouroboros_config() one). This parser engine is only for a
+ * convenience when basic configuration is required and there is already an
+ * INI-like file in the supervised project. */
+int load_ouroboros_ini_config(const char *filename, struct ouroboros_config *config) {
+
+	/* passing NULL does not trigger error */
+	if (filename == NULL)
+		return 0;
+
+	dictionary *dict;
+	/* Neither section nor configuration key definition is passed from the
+	 * user, so it is safe to allocate a static buffer for iniparser keys. */
+	char key[32];
+	char *tmp, *p, *t;
+	int val;
+
+	if ((dict = iniparser_load(filename)) == NULL)
+		return -1;
+
+	sprintf(key, "ouroboros:%s", OCKD_WATCH_ENGINE);
+	if ((tmp = iniparser_getstring(dict, key, NULL)) != NULL)
+		if ((val = ouroboros_config_get_engine(tmp)) != -1)
+			config->engine = val;
+
+	sprintf(key, "ouroboros:%s", OCKD_WATCH_RECURSIVE);
+	config->watch_recursive = iniparser_getboolean(dict, key, config->watch_recursive);
+
+	sprintf(key, "ouroboros:%s", OCKD_WATCH_UPDATE_NODES);
+	config->watch_update_nodes = iniparser_getboolean(dict, key, config->watch_update_nodes);
+
+	sprintf(key, "ouroboros:%s", OCKD_WATCH_PATH);
+	if ((tmp = iniparser_getstring(dict, key, NULL)) != NULL && (tmp = strdup(tmp)) != NULL) {
+		_free_array(&config->watch_paths);
+		for (p = tmp; (t = strtok(p, " ")) != NULL; p = NULL)
+			ouroboros_config_add_string(&config->watch_paths, t);
+		free(tmp);
+	}
+
+	sprintf(key, "ouroboros:%s", OCKD_WATCH_INCLUDE);
+	if ((tmp = iniparser_getstring(dict, key, NULL)) != NULL && (tmp = strdup(tmp)) != NULL) {
+		_free_array(&config->watch_includes);
+		for (p = tmp; (t = strtok(p, " ")) != NULL; p = NULL)
+			ouroboros_config_add_string(&config->watch_includes, t);
+		free(tmp);
+	}
+
+	sprintf(key, "ouroboros:%s", OCKD_KILL_SIGNAL);
+	if ((tmp = iniparser_getstring(dict, key, NULL)) != NULL)
+		if ((val = ouroboros_config_get_signal(tmp)) != 0)
+			config->kill_signal = val;
+
+	sprintf(key, "ouroboros:%s", OCKD_KILL_LATENCY);
+	config->kill_latency = iniparser_getdouble(dict, key, config->kill_latency);
+
+	iniparser_freedict(dict);
+	return 0;
+}
+#endif /* ENABLE_INIPARSER */
 
 /* Dump configuration settings on the standard error output. */
 void dump_ouroboros_config(const struct ouroboros_config *config) {

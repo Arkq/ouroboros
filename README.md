@@ -24,8 +24,15 @@ Installation
 
 	$ autoreconf --install
 	$ mkdir build && cd build
-	$ ../configure --enable-libconfig --enable-server
+	$ ../configure --enable-libconfig --enable-iniparser --enable-server
 	$ make && make install
+
+Optional dependencies:
+
+* [libconfig](http://www.hyperrealm.com/libconfig/) - Support for loading configuration from a
+  file. Note, that it is not possible to configure all available options via the command line
+  arguments, so it is highly advised to compile ouroboros with the libconfig enabled.
+* [iniparser](http://ndevilla.free.fr/iniparser/) - Support for INI-like configuration files.
 
 
 Usage
@@ -33,8 +40,8 @@ Usage
 
 There are a few configuration options which might need to be tailored for ones requirements,
 however default options should be good enough to start with. For all available options see the
-exemplary configuration file. Most of those options - the important ones - might be specified
-during the runtime as well.
+exemplary [configuration file](/doc/example.conf). Most of these options - the important ones -
+might be specified during the runtime as well.
 
 Ouroboros acts like a wrapper, so the basic invocation looks like this:
 

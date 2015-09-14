@@ -11,6 +11,10 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
+#if HAVE_CONFIG_H
+#include "../config.h"
+#endif
+
 #include "notify.h"
 
 
@@ -70,6 +74,9 @@ void ouroboros_config_free(struct ouroboros_config *config);
 
 int load_ouroboros_config(const char *filename, const char *appname,
 		struct ouroboros_config *config);
+#if ENABLE_INIPARSER
+int load_ouroboros_ini_config(const char *filename, struct ouroboros_config *config);
+#endif
 
 void dump_ouroboros_config(const struct ouroboros_config *config);
 

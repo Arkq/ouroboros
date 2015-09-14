@@ -66,7 +66,8 @@ int main(int argc, char **argv) {
 		{ "help", no_argument, NULL, 'h' },
 #if ENABLE_LIBCONFIG
 		{ "config", required_argument, NULL, 'c' },
-#endif
+		{ "conf-ini", no_argument, NULL, 1 },
+#endif /* ENABLE_LIBCONFIG */
 		{ "verbose", no_argument, NULL, 'v' },
 		/* runtime configuration */
 		{ OCKD_WATCH_ENGINE, required_argument, NULL, 'E' },
@@ -88,8 +89,10 @@ int main(int argc, char **argv) {
 #if ENABLE_LIBCONFIG
 	char *config_appname = NULL;
 	char *config_file = NULL;
+	int config_ini = 0;
 #endif
 	int verbose = 0;
+	int rv;
 
 	/* parse options - first pass */
 	while ((opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1)
@@ -100,7 +103,10 @@ return_usage:
 					"options:\n"
 #if ENABLE_LIBCONFIG
 					"  -c, --config=FILE\t\tuse this configuration file\n"
+#if ENABLE_INIPARSER
+					"  --conf-ini\t\t\tuse INI parser for configuration file\n"
 #endif
+#endif /* ENABLE_LIBCONFIG */
 					"  -v, --verbose\t\t\tbe more verbose during the operation\n"
 					"  -E, --watch-engine=TYPE\n"
 					"  -p, --watch-path=DIR\n"
@@ -121,6 +127,11 @@ return_usage:
 		case 'c':
 			config_file = strdup(optarg);
 			break;
+#if ENABLE_INIPARSER
+		case 1:
+			config_ini = 1;
+			break;
+#endif /* ENABLE_INIPARSER */
 #endif /* ENABLE_LIBCONFIG */
 
 		case 'v':
@@ -147,7 +158,13 @@ return_usage:
 	config_appname = strdup(argv[optind]);
 	if (verbose)
 		fprintf(stderr, "Loading configuration: %s\n", config_file);
-	if (load_ouroboros_config(config_file, basename(argv[optind]), &config))
+#if ENABLE_INIPARSER
+	if (config_ini)
+		rv = load_ouroboros_ini_config(config_file, &config);
+	else
+#endif /* ENABLE_INIPARSER */
+		rv = load_ouroboros_config(config_file, basename(argv[optind]), &config);
+	if (rv)
 		fprintf(stderr, "warning: unable to load configuration file\n");
 	free(config_appname);
 	free(config_file);
@@ -221,7 +238,6 @@ return_usage:
 	char buffer[1024];
 	enum action action;
 	int timeout;
-	int rv;
 
 	/* it is our crucial subsystem - running without it is pointless */
 	if ((notify = ouroboros_notify_init(config.engine)) == NULL)
@@ -380,6 +396,9 @@ return_usage:
 		rv = WEXITSTATUS(process.status);
 		debug("process exit status: %d", rv);
 	}
+
+	if (verbose)
+		fprintf(stderr, "Exiting gracefully!\n");
 
 	ouroboros_process_free(&process);
 #if ENABLE_SERVER

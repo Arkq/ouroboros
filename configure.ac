@@ -46,6 +46,31 @@ AM_COND_IF(
 	)],
 )
 
+# support for the iniparser
+AC_ARG_ENABLE(
+	[iniparser],
+	[AS_HELP_STRING([--enable-iniparser], [enable iniparser support])],
+)
+AM_CONDITIONAL([ENABLE_INIPARSER], [test "x$enable_iniparser" = "xyes"])
+AM_COND_IF(
+	[ENABLE_INIPARSER],
+	[
+		AM_COND_IF(
+			[ENABLE_LIBCONFIG],
+			[], [AC_MSG_ERROR([iniparser requires libconfig to be enabled])],
+		)
+		AC_CHECK_HEADERS(
+			[iniparser.h],
+			[], [AC_MSG_ERROR([iniparser.h header not found])],
+		)
+		AC_CHECK_LIB(
+			[iniparser], [iniparser_load],
+			[], [AC_MSG_ERROR([iniparser library not found])],
+		)
+		AC_DEFINE([ENABLE_INIPARSER], [1], [Define to 1 if iniparser is enabled])
+	],
+)
+
 # support for server/client interaction
 AC_ARG_ENABLE(
 	[server],
