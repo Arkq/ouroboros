@@ -351,7 +351,7 @@ int ouroboros_notify_watch_path(struct ouroboros_notify *notify, const char *pat
 						break;
 
 				/* add new watched location (full patch) */
-				if (!i) {
+				if (i == -1) {
 					notify->s.inotify.size++;
 					notify->s.inotify.watched = realloc(notify->s.inotify.watched,
 							sizeof(*notify->s.inotify.watched) * notify->s.inotify.size);
