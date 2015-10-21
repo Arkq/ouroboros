@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/wait.h>
 
 #include "config.h"
@@ -238,6 +239,11 @@ return_usage:
 	char buffer[1024];
 	enum action action;
 	int timeout;
+
+	/* try to place ourself in the new session (with new process group ID),
+	 * so we will have a better control over supervised processes */
+	if (setsid() == -1)
+		perror("warning: creating session failed");
 
 	/* it is our crucial subsystem - running without it is pointless */
 	if ((notify = ouroboros_notify_init(config.engine)) == NULL)
