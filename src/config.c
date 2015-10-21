@@ -75,9 +75,12 @@ void ouroboros_config_free(struct ouroboros_config *config) {
 	_free_array(&config->watch_includes);
 	_free_array(&config->watch_excludes);
 	free(config->redirect_output);
+	config->redirect_output = NULL;
 	free(config->redirect_signals);
+	config->redirect_signals = NULL;
 #if ENABLE_SERVER
 	free(config->server_iface);
+	config->server_iface = NULL;
 #endif
 }
 
