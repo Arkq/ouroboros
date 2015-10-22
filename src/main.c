@@ -240,10 +240,10 @@ return_usage:
 	enum action action;
 	int timeout;
 
-	/* try to place ourself in the new session (with new process group ID),
-	 * so we will have a better control over supervised processes */
-	if (setsid() == -1)
-		perror("warning: creating session failed");
+	/* try to place ourself in a new (our own) process group ID, so we will
+	 * have a better control over supervised processes */
+	if (setpgid(0, 0) == -1)
+		perror("warning: setting process group failed");
 
 	/* it is our crucial subsystem - running without it is pointless */
 	if ((notify = ouroboros_notify_init(config.engine)) == NULL)
