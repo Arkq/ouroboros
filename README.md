@@ -4,9 +4,11 @@ Ouroboros - Ongoing Build Assistant
 Developing (building) service-based systems might be a really painful process, especially when it
 comes to testing it. In the most strict scenario you will need a running server instance, and
 every time a new code is deployed you will have to restart it. If you are using some framework,
-this task is probably done for you automatically. But what if you grew out of frameworks and to-do
-list apps, and want to make something for yourself. So in this case you have to make your own
-developing environment - service reloading and crash maintaining.
+this task is probably done for you automatically. But what if you grew out of frameworks and you
+want to make something for yourself? (Don't take me wrong on this. I'm not saying that frameworks
+are bad - in fact they are good in most scenarios - I'm just pointing the fact that framework
+might restrict ones freedom of choices.) So in this case you have to make your own developing
+environment - service reloading and crash maintaining.
 
 Recently, I was put in such a situation and after a while I was shocked, that there is no black
 box like solution for this task. There is a framework way or the highway - simply put, you are out
