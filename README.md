@@ -1,5 +1,5 @@
-Ouroboros - Ongoing Build Assistant
-===================================
+Ouroboros [![Build Status](https://travis-ci.org/Arkq/ouroboros.svg?branch=master)](https://travis-ci.org/Arkq/ouroboros)
+=========
 
 Developing (building) service-based systems might be a really painful process, especially when it
 comes to testing it. In the most strict scenario you will need a running server instance, and

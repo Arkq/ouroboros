@@ -1,12 +1,11 @@
-sudo: false
+sudo: required
+dist: trusty
 
 language: c
 
-addons:
-  apt:
-    packages:
-      - libconfig-dev
-      - libprocps4-dev
+install:
+  - sudo apt-get update
+  - sudo apt-get -y install libconfig-dev libprocps3-dev
 
 before_script:
   - autoreconf --install && mkdir build && cd build
