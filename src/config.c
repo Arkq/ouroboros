@@ -330,14 +330,12 @@ void dump_ouroboros_config(const struct ouroboros_config *config) {
 			"  watch recursive:\t%s\n"
 			"  watch update nodes:\t%s\n"
 			"  watch dirs only:\t%s\n"
-			"  watch files only:\t%s\n"
-			"",
+			"  watch files only:\t%s\n",
 			_engine(config->engine),
 			_boolean(config->watch_recursive),
 			_boolean(config->watch_update_nodes),
 			_boolean(config->watch_dirs_only),
-			_boolean(config->watch_files_only),
-			NULL);
+			_boolean(config->watch_files_only));
 
 	_dump_array_char("  watch paths:\t\t", config->watch_paths);
 	_dump_array_char("  watch includes:\t", config->watch_includes);
@@ -348,25 +346,21 @@ void dump_ouroboros_config(const struct ouroboros_config *config) {
 			"  kill latency:\t\t%.2f s\n"
 			"  start latency:\t%.2f s\n"
 			"  redirect input:\t%s\n"
-			"  redirect output:\t%s\n"
-			"",
+			"  redirect output:\t%s\n",
 			config->kill_signal,
 			config->kill_latency,
 			config->start_latency,
 			_boolean(config->redirect_input),
-			config->redirect_output,
-			NULL);
+			config->redirect_output);
 
 	_dump_array_int("  redirect signals:\t", config->redirect_signals);
 
 #if ENABLE_SERVER
 	fprintf(stderr,
 			"  server iface:\t\t%s\n"
-			"  server port:\t\t%u\n"
-			"",
+			"  server port:\t\t%u\n",
 			config->server_iface,
-			config->server_port,
-			NULL);
+			config->server_port);
 #endif /* ENABLE_SERVER */
 
 }
