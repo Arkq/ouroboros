@@ -3,7 +3,7 @@
 
 AC_INIT([ouroboros], [0.0.1], [arkadiusz.bokowy@gmail.com])
 AC_CONFIG_HEADERS([config.h])
-AM_INIT_AUTOMAKE([foreign -Wall -Werror])
+AM_INIT_AUTOMAKE([foreign subdir-objects -Wall -Werror])
 
 AC_PROG_CC
 AM_PROG_CC_C_O
