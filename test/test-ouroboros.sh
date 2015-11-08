@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 OUROBOROS=$srcdir/../build/src/ouroboros
 PROJECT=$srcdir/project-tree.tgz

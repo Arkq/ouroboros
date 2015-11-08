@@ -12,4 +12,6 @@ before_script:
 
 script:
   - ../configure && make && make check
+  - cat test/test-suite.log
   - ../configure --enable-libconfig --enable-server && make && make check
+  - cat test/test-suite.log

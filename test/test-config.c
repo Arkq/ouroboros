@@ -179,8 +179,9 @@ static void test_iniparser(void) {
 #endif /* ENABLE_INIPARSER */
 }
 
-void main(void) {
+int main(void) {
 	test_default_values();
 	test_libconfig();
 	test_iniparser();
+	return EXIT_SUCCESS;
 }
