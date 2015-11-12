@@ -464,7 +464,8 @@ int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 
 				/* get the index of watch descriptor from the current event */
 				i = notify->s.inotify.size;
-				while (i && notify->s.inotify.watched[--i].wd != e->wd);
+				while (i && notify->s.inotify.watched[--i].wd != e->wd)
+					continue;
 
 				char *tmp = malloc(strlen(notify->s.inotify.watched[i].path) + strlen(e->name) + 2);
 				sprintf(tmp, "%s/%s", notify->s.inotify.watched[i].path, e->name);
@@ -477,7 +478,8 @@ int ouroboros_notify_dispatch(struct ouroboros_notify *notify) {
 
 				/* get the index of watch descriptor from the current event */
 				i = notify->s.inotify.size;
-				while (i && notify->s.inotify.watched[--i].wd != e->wd);
+				while (i && notify->s.inotify.watched[--i].wd != e->wd)
+					continue;
 
 				notify->s.inotify.size--;
 				free(notify->s.inotify.watched[i].path);
