@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../src/config.h"
+
+#include "../src/config.c"
 
 static const char *config_libconfig =
 	"watch-engine = \"inotify\";\n"
