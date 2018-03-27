@@ -29,6 +29,11 @@ Installation
 	$ ../configure --enable-libconfig --enable-iniparser --enable-server
 	$ make && make install
 
+For statically linked binary set `LDFLAGS` environment variable before configuration as follows:
+
+	$ LDFLAGS=-static ../configure --enable-libconfig --enable-iniparser --enable-server
+	$ make && make install
+
 Optional dependencies:
 
 * [libconfig](http://www.hyperrealm.com/libconfig/) - Support for loading configuration from a
